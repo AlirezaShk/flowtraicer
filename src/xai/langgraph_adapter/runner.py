@@ -7,7 +7,7 @@ node is entered and a ``task_result`` chunk when it exits. Each node becomes a
 To enrich a step, a node may write these conventional keys to graph state — the runner
 records whatever it finds:
 
-* ``tool_calls``: ``list[{"name": str, "payload": dict}]`` -> tool-call events.
+* ``tool_calls``: ``list[{"name": str, "payload"?: dict}]`` -> tool-call events (payload optional).
 * ``llm_calls``: ``list[{"name": str, "prompt_tokens": int, "completion_tokens": int,
   "total_tokens"?: int, "duration_ms"?: float, "model"?: str}]`` -> llm-call events with
   token usage (so per-step / per-engagement token cost is captured).

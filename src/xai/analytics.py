@@ -22,9 +22,10 @@ class FunnelStep(BaseModel):
     name: str
     #: Engagements that reached this step.
     reached: int
-    #: Engagements that reached this step but not the next one in the order.
+    #: Engagements that ended *at* this step (from the recorded ``dropped_at``).
     dropped: int
-    #: Fraction that proceeded to the next step (``None`` for the final step).
+    #: Fraction that continued past this step, ``(reached - dropped) / reached`` — always in
+    #: [0, 1]; ``None`` for the final step. Correct even with optional steps in the order.
     conversion_rate: float | None
     #: Mean wall-clock duration of this step (over engagements that have a measure).
     avg_duration_ms: float | None
@@ -51,11 +52,17 @@ def funnel(store, order: list[str], *, where: dict | None = None) -> Funnel:
     """
     engagements = _load(store, where)
 
-    # Per step name: how many engagements reached it, the durations, and token totals.
+    # Per step name: how many engagements reached it, the durations, token totals, and how
+    # many *ended* there. Drop-off is read from the recorded ``dropped_at`` rather than from
+    # subtracting reached-counts, so it stays correct when the order contains optional steps
+    # (where a later step can have a higher reached-count than an earlier optional one).
     reached: dict[str, int] = defaultdict(int)
     durations: dict[str, list[float]] = defaultdict(list)
     tokens: dict[str, int] = defaultdict(int)
+    dropped: dict[str, int] = defaultdict(int)
     for eng in engagements:
+        if eng.dropped_at is not None:
+            dropped[eng.dropped_at] += 1
         seen: set[str] = set()
         for step in eng.steps:
             if step.name in seen:
@@ -69,15 +76,17 @@ def funnel(store, order: list[str], *, where: dict | None = None) -> Funnel:
     steps: list[FunnelStep] = []
     for i, name in enumerate(order):
         here = reached.get(name, 0)
+        dropped_here = dropped.get(name, 0)
         is_last = i == len(order) - 1
-        nxt = reached.get(order[i + 1], 0) if not is_last else 0
         dur = durations.get(name, [])
+        # Fraction that continued past this step (didn't abandon here). Always in [0, 1].
+        conversion = None if is_last else ((here - dropped_here) / here if here else 0.0)
         steps.append(
             FunnelStep(
                 name=name,
                 reached=here,
-                dropped=max(0, here - nxt) if not is_last else 0,
-                conversion_rate=(None if is_last else (nxt / here if here else 0.0)),
+                dropped=dropped_here,
+                conversion_rate=conversion,
                 avg_duration_ms=(sum(dur) / len(dur) if dur else None),
                 total_tokens=tokens.get(name, 0),
             )

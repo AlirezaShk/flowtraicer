@@ -163,6 +163,10 @@ group_by(store, "user_id")          # {user_id: [summary, ...]}
 store.list_engagements(where={"session_id": "s-1"})   # metadata-filtered index
 ```
 
+Drop-off is read from each engagement's recorded `dropped_at`, so the funnel stays correct
+even when `order` contains an **optional** step (e.g. `comparison`) — `conversion_rate` is
+always in `[0, 1]`.
+
 ## Viewing traces
 
 The viewer is a FastAPI app + a Cytoscape.js single page (graph on top, timeline below,

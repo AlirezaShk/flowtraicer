@@ -75,6 +75,25 @@ def test_funnel_reached_dropped_conversion_tokens():
     assert by_name["submitted"].conversion_rate is None
 
 
+def test_funnel_drop_off_uses_recorded_dropped_at_not_subtraction():
+    # An optional branch makes reached[comparison] < reached[application]; the funnel must
+    # use the recorded dropped_at, not reached-count subtraction (which would mis-report).
+    store = SQLiteStore()
+    _journey(store, "a", "1", ["intake", "selection", "comparison", "application", "submitted"])
+    _journey(store, "b", "1", ["intake", "selection", "application", "submitted"])  # skip compare
+    _journey(store, "c", "1", ["intake", "selection", "comparison"], completed=False)  # drop here
+
+    f = funnel(store, ORDER)
+    by_name = {s.name: s for s in f.steps}
+
+    # 2 reached comparison (a, c); exactly 1 dropped there (c) — not 2-2=0, never negative.
+    assert by_name["comparison"].reached == 2
+    assert by_name["comparison"].dropped == 1
+    assert by_name["comparison"].conversion_rate == 0.5
+    # Conversion never exceeds 1.0 even though application.reached (2) > comparison.reached.
+    assert all(s.conversion_rate is None or s.conversion_rate <= 1.0 for s in f.steps)
+
+
 def test_journeys_and_group_by():
     store = SQLiteStore()
     _seed(store)
