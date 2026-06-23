@@ -162,6 +162,33 @@ return {"extraction": result.as_record().model_dump()}
 extractor.extract_and_record(recorder, step_id, BudgetInfo, "Shibuya, around ¥95,000")
 ```
 
+## Declarative workflows (the DSL)
+
+`xai.orchestration.Workflow` is sugar over LangGraph: declare steps (with tools), global
+steps, goals, and edges once — it compiles the graph and wires per-step tools / global nodes
+/ goal nodes into the recorder, so there's no separate bookkeeping to pass to the runner.
+
+```python
+from xai.orchestration import Workflow
+
+wf = Workflow("school_journey", state_schema=State, goal_nodes={"submit"})
+
+@wf.step(tools=["search_schools"])
+def school_selection(state): ...
+
+@wf.global_step                      # entering it records an intent switch
+def escalate(state): ...
+
+wf.entry("intake")
+wf.edge("intake", "school_selection")
+wf.branch("school_selection", router, {"compare": "comparison", "apply": "consent"})
+wf.finish("submit")
+
+engagement_id = await wf.run(initial_state, recorder, metadata={"user_id": "u1"})
+```
+
+(The hand-wired `run_instrumented` approach still works; the DSL is optional sugar.)
+
 ## Storage backends
 
 The `Store` is pluggable (append-only: write a record, reconstruct an engagement, list
@@ -182,6 +209,25 @@ store = PostgresStore("postgresql://localhost/xai")  # durable JSONB + LISTEN/NO
 - **SQLite** — local dev, single process, audit-friendly append-only file.
 - **Redis** — cross-process live monitoring (recorder and viewer can be separate services).
 - **Postgres** — durable + queryable for production, with `LISTEN/NOTIFY` live updates.
+
+## Audit & retention
+
+```python
+from datetime import timedelta
+from xai.retention import RetentionPolicy, purge_before
+from xai.audit import engagement_digest, verify
+
+# retention — drop whole completed engagements past their window (active ones never purged)
+purged_ids = RetentionPolicy(max_age=timedelta(days=90)).apply(store, now=...)
+# or: purge_before(store, cutoff_datetime)
+
+# tamper-evidence — fingerprint an engagement; later, detect any alteration
+digest = engagement_digest(store.get_engagement(eid))   # store this when the engagement ends
+verify(store.get_engagement(eid), digest)               # -> False if the trail was altered
+```
+
+Anchor the digest outside the trace store (WORM / transparency log / signature) for strong
+tamper-evidence — see `xai/audit.py` for the threat model.
 
 ## Analytics: funnels & journeys
 
@@ -241,8 +287,11 @@ The API behind the viewer:
 | `xai.store` | append-only `Store` protocol + SQLite default backend |
 | `xai.recorder` | the fail-open emit contract |
 | `xai.langgraph_adapter` | `run_instrumented` + `read_topology` |
+| `xai.orchestration` | `Workflow` DSL — declare steps/global-steps/tools/goals over LangGraph |
 | `xai.extraction` | Instructor-powered per-step schema extraction |
+| `xai.llm` | config-driven multi-provider LLM calls (LiteLLM) |
 | `xai.analytics` | cross-engagement funnels, drop-off, journey grouping |
+| `xai.retention` / `xai.audit` | purge old engagements; tamper-evident digests |
 | `xai.timeline` | temporal viewmodel for the timeline view |
 | `xai.server` | FastAPI query + live-stream API and the viewer |
 
@@ -251,10 +300,10 @@ recorder's small emit API, so other engines can be added as adapters later.
 
 ## Status & roadmap
 
-Done: trace core + SQLite store, LangGraph auto-instrumentation, Instructor extraction,
-**per-step token cost**, **goals/abandonment + drop-off analytics**, and the linked
-graph/timeline viewer. Planned: Postgres/Redis store adapters, audit retention, an
-orchestration DSL. See [`docs/`](docs/).
+Done: trace core + SQLite/Redis/Postgres stores, LangGraph auto-instrumentation + the
+`Workflow` DSL, Instructor extraction, config-driven LLM (LiteLLM), **per-step token cost**,
+**goals/abandonment + drop-off analytics**, retention + tamper-evident audit, and the linked
+graph/timeline viewer. Planned: OSS packaging. See [`docs/`](docs/).
 
 ## License
 
