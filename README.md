@@ -93,16 +93,36 @@ for step in engagement.steps:
 ### Enriching a step from inside a node
 
 `run_instrumented` records node entry/exit, timing, and intent switches automatically. To
-also capture **tool calls** and a **per-step extraction**, a node may write two
-conventional keys to graph state — the runner records whatever it finds:
+capture more, a node may write these **conventional state keys** — the runner records
+whatever it finds, so nodes never need a handle to the recorder:
 
 ```python
 def qualify(state):
     return {
         "messages": ["got it"],
+        # tools the node called:
         "tool_calls": [{"name": "lookup_area", "payload": {"area": "Shibuya"}}],
+        # LLM calls with token cost (rolls up into step.total_tokens / engagement.total_tokens):
+        "llm_calls": [{"name": "gpt-4o-mini", "prompt_tokens": 64, "completion_tokens": 20}],
+        # any other typed event (kind = llm_call|tool_call|extraction|log|error):
+        "events": [{"kind": "log", "name": "cache_hit", "payload": {"key": "shibuya"}}],
+        # a per-step structured extraction:
         "extraction": {"schema_name": "BudgetInfo", "values": {"budget": 95000}},
     }
+```
+
+`State` must declare these keys (use `Annotated[list, add]` for the list-valued ones).
+Outside a graph you can also call the recorder directly:
+`recorder.record_llm_call(step_id, "gpt-4o", prompt=64, completion=20)`.
+
+### Drop-off: goals & abandonment
+
+Pass `goal_nodes` to mark journeys that never reached a goal as **abandoned** (instead of
+the indistinguishable `completed`), with `dropped_at` set to the last step reached:
+
+```python
+await run_instrumented(app, state, recorder,
+                       goal_nodes={"submitted"})   # didn't reach it -> ABANDONED
 ```
 
 ### Per-step schema extraction (Instructor + Pydantic)
@@ -122,6 +142,25 @@ result = extractor.extract(BudgetInfo, "Shibuya, around ¥95,000")
 return {"extraction": result.as_record().model_dump()}
 # anywhere else — record directly:
 extractor.extract_and_record(recorder, step_id, BudgetInfo, "Shibuya, around ¥95,000")
+```
+
+## Analytics: funnels & journeys
+
+Across many engagements (tag each with `user_id`/`session_id` in `metadata`), answer
+*"where do users drop off, and what did each step cost?"*:
+
+```python
+from xai.analytics import funnel, journeys, group_by
+
+f = funnel(store, ["intake", "school_selection", "comparison", "application", "submitted"])
+for step in f.steps:
+    print(step.name, "reached", step.reached, "dropped", step.dropped,
+          "conv", step.conversion_rate, "tokens", step.total_tokens,
+          "avg_ms", step.avg_duration_ms)
+
+journeys(store, user_id="u-42")     # all engagements for one user (filtered summaries)
+group_by(store, "user_id")          # {user_id: [summary, ...]}
+store.list_engagements(where={"session_id": "s-1"})   # metadata-filtered index
 ```
 
 ## Viewing traces
