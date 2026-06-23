@@ -2,16 +2,37 @@
 
 from types import SimpleNamespace
 
+import pytest
+
 from xai.core.model import TokenUsage
 from xai.llm import LiteLLMClient, LLMResult
 
 
-def _fake_completion(**kwargs):
-    _fake_completion.last = kwargs
+def _fake_response():
     return SimpleNamespace(
         choices=[SimpleNamespace(message=SimpleNamespace(content="hello world"))],
         usage=SimpleNamespace(prompt_tokens=12, completion_tokens=5, total_tokens=17),
     )
+
+
+def _fake_completion(**kwargs):
+    _fake_completion.last = kwargs
+    return _fake_response()
+
+
+async def _fake_acompletion(**kwargs):
+    _fake_acompletion.last = kwargs
+    return _fake_response()
+
+
+@pytest.mark.asyncio
+async def test_acomplete_awaits_and_returns_tokens():
+    client = LiteLLMClient(provider="openai", model="gpt-5-nano", _acompletion=_fake_acompletion)
+    result = await client.acomplete("hi")
+    assert isinstance(result, LLMResult)
+    assert result.text == "hello world"
+    assert result.tokens.total == 17
+    assert _fake_acompletion.last["model"] == "openai/gpt-5-nano"
 
 
 def test_complete_returns_text_and_token_usage():

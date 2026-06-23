@@ -77,44 +77,63 @@ class LiteLLMClient:
         model: str,
         api_key: str | None = None,
         _completion=None,
+        _acompletion=None,
         **settings,
     ) -> None:
         self.model = f"{provider}/{model}" if provider else model
         self._api_key = api_key
         self._settings = settings
         self._completion = _completion  # injectable for tests
+        self._acompletion = _acompletion
 
     @classmethod
-    def from_config(cls, config: dict, *, _completion=None) -> LiteLLMClient:
+    def from_config(cls, config: dict, *, _completion=None, _acompletion=None) -> LiteLLMClient:
         """Build from a config blob like ``{"llm_provider", "model", "key", ...settings}``."""
         config = dict(config)
         provider = config.pop("llm_provider", None) or config.pop("provider", None)
         model = config.pop("model")
         api_key = config.pop("key", None) or config.pop("api_key", None)
         return cls(
-            provider=provider, model=model, api_key=api_key, _completion=_completion, **config
+            provider=provider,
+            model=model,
+            api_key=api_key,
+            _completion=_completion,
+            _acompletion=_acompletion,
+            **config,
         )
 
-    def _complete_fn(self):
-        if self._completion is not None:
-            return self._completion
-        import litellm
-
-        return litellm.completion
-
-    def complete(self, messages: Messages, **overrides) -> LLMResult:
-        """Run a completion and return its text + token usage."""
+    def _call_kwargs(self, messages: Messages, overrides: dict) -> dict:
         kwargs = dict(self._settings)
         kwargs.update(overrides)
         if self._api_key is not None:
             kwargs.setdefault("api_key", self._api_key)
-        response = self._complete_fn()(model=self.model, messages=_normalize(messages), **kwargs)
+        return {"model": self.model, "messages": _normalize(messages), **kwargs}
 
-        text = response.choices[0].message.content
+    def _to_result(self, response) -> LLMResult:
         usage = getattr(response, "usage", None)
         tokens = TokenUsage(
             prompt=getattr(usage, "prompt_tokens", 0) or 0,
             completion=getattr(usage, "completion_tokens", 0) or 0,
             total=getattr(usage, "total_tokens", 0) or 0,
         )
-        return LLMResult(text=text, tokens=tokens, model=self.model, raw=response)
+        return LLMResult(
+            text=response.choices[0].message.content, tokens=tokens, model=self.model, raw=response
+        )
+
+    def complete(self, messages: Messages, **overrides) -> LLMResult:
+        """Run a completion and return its text + token usage."""
+        fn = self._completion
+        if fn is None:
+            import litellm
+
+            fn = litellm.completion
+        return self._to_result(fn(**self._call_kwargs(messages, overrides)))
+
+    async def acomplete(self, messages: Messages, **overrides) -> LLMResult:
+        """Async variant of :meth:`complete` (uses ``litellm.acompletion``)."""
+        fn = self._acompletion
+        if fn is None:
+            import litellm
+
+            fn = litellm.acompletion
+        return self._to_result(await fn(**self._call_kwargs(messages, overrides)))
