@@ -5,11 +5,14 @@ Workflow::
     greet -> qualify -> (router) -> search        (happy path)
                                  \\-> escalate     (global re-route)
 
-``qualify`` writes a ``tool_calls`` entry and an ``extraction`` to state, so the captured
-trace contains a tool-call event and a per-step extraction. ``escalate`` is a *global*
+``qualify`` runs the Instructor-powered :class:`~xai.extraction.Extractor` to pull a
+``BudgetInfo`` schema, then writes ``result.as_record()`` to state under ``extraction`` —
+the record-via-state path the runner records automatically. ``escalate`` is a *global*
 step: routing into it records an intent switch.
 
-No LLM/network is used — node logic is deterministic, so this runs anywhere (CI-safe).
+No LLM/network is used — a deterministic stub client stands in for a real provider, so this
+runs anywhere (CI-safe). In a real agent you would build the extractor with
+``Extractor.from_provider("openai/gpt-4o-mini")`` instead.
 """
 
 from __future__ import annotations
@@ -18,9 +21,30 @@ from operator import add
 from typing import Annotated, TypedDict
 
 from langgraph.graph import END, START, StateGraph
+from pydantic import BaseModel
 
+from xai.extraction import Extractor
 from xai.langgraph_adapter import run_instrumented
 from xai.recorder import Recorder
+
+
+class BudgetInfo(BaseModel):
+    """The per-step schema extracted in ``qualify``."""
+
+    budget: int
+    area: str
+
+
+class _StubExtractionClient:
+    """Deterministic stand-in for an Instructor client, so the demo runs offline.
+
+    Swap ``Extractor(_StubExtractionClient())`` for ``Extractor.from_provider(...)`` to
+    extract with a real LLM.
+    """
+
+    def create(self, *, response_model, messages, **kwargs):
+        return response_model(budget=95000, area="Shibuya")
+
 
 #: Nodes that re-route the workflow's intent when entered.
 GLOBAL_NODES = {"escalate"}
@@ -41,18 +65,12 @@ def _greet(state: DemoState) -> dict:
 
 
 def _qualify(state: DemoState) -> dict:
+    extractor = Extractor(_StubExtractionClient())
+    result = extractor.extract(BudgetInfo, "I'm looking in Shibuya, budget about ¥95,000 a month.")
     return {
-        "msgs": ["Got it — budget around ¥95,000 in Shibuya."],
-        "tool_calls": [{"name": "lookup_area", "payload": {"area": "Shibuya"}}],
-        "extraction": {
-            "schema_name": "BudgetInfo",
-            "json_schema": {
-                "type": "object",
-                "properties": {"budget": {"type": "integer"}, "area": {"type": "string"}},
-            },
-            "values": {"budget": 95000, "area": "Shibuya"},
-            "confidence": 0.9,
-        },
+        "msgs": [f"Got it — ¥{result.value.budget:,} in {result.value.area}."],
+        "tool_calls": [{"name": "lookup_area", "payload": {"area": result.value.area}}],
+        "extraction": result.as_record().model_dump(),
     }
 
 

@@ -25,8 +25,29 @@ end on one LangGraph run:
 - `store` — append-only trace store (default: **SQLite + in-process pub/sub**).
 - `recorder` — the fail-open emit contract.
 - `langgraph_adapter` — auto-instruments a LangGraph run into the trace.
+- `extraction` — **Instructor + Pydantic** per-step schema extraction, provider-agnostic.
 - `server` — FastAPI query + live-stream API.
 - `viewer` — Cytoscape.js **graph view** with the executed path highlighted.
+
+### Per-step schema extraction
+
+```python
+from pydantic import BaseModel
+from xai.extraction import Extractor
+
+class BudgetInfo(BaseModel):
+    budget: int
+    area: str
+
+extractor = Extractor.from_provider("openai/gpt-4o-mini")   # or anthropic/… , google/…
+result = extractor.extract(BudgetInfo, "Shibuya, around ¥95,000")
+
+# LangGraph happy path: write the record to state; the runner records it.
+return {"extraction": result.as_record().model_dump()}
+# Manual: extractor.extract_and_record(recorder, step_id, BudgetInfo, "...")
+```
+
+Install a provider SDK alongside the extra: `pip install -e ".[extraction,openai]"`.
 
 See the design doc for the deferred roadmap (timeline view, Instructor-powered extraction,
 Postgres/Redis adapters, audit retention, orchestration DSL).
