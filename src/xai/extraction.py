@@ -49,9 +49,11 @@ class ExtractionResult:
 
     @property
     def values(self) -> dict:
+        """The extracted values as a plain dict."""
         return self.value.model_dump()
 
     def as_record(self) -> Extraction:
+        """Convert to an :class:`~xai.core.model.Extraction` for recording into the trace."""
         return Extraction(
             schema_name=self.schema.__name__,
             json_schema=self.schema.model_json_schema(),

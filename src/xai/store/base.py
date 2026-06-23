@@ -35,6 +35,7 @@ class EngagementSummary(BaseModel):
 
     @classmethod
     def from_engagement(cls, eng: Engagement) -> EngagementSummary:
+        """Roll a full engagement up into a lightweight listing row."""
         return cls(
             id=eng.id,
             name=eng.name,

@@ -45,6 +45,7 @@ class SQLiteStore:
     # -- writes ---------------------------------------------------------------
 
     def append(self, record: Record) -> None:
+        """Persist a record (append-only) and publish it to live subscribers."""
         cur = self._conn.execute(
             "INSERT INTO records (engagement_id, type, ts, data) VALUES (?, ?, ?, ?)",
             (
@@ -75,12 +76,14 @@ class SQLiteStore:
         return [RecordAdapter.validate_json(row[0]) for row in rows]
 
     def get_engagement(self, engagement_id: str) -> Engagement:
+        """Reconstruct one engagement by folding its records. Raises ``KeyError`` if unknown."""
         records = self._records_for(engagement_id)
         if not records:
             raise KeyError(engagement_id)
         return fold(records)
 
     def list_engagements(self, where: dict | None = None) -> list[EngagementSummary]:
+        """Summaries (oldest first), optionally filtered to those whose metadata match ``where``."""
         ids = self._conn.execute(
             "SELECT engagement_id FROM records GROUP BY engagement_id ORDER BY MIN(seq)"
         ).fetchall()
@@ -90,6 +93,7 @@ class SQLiteStore:
     # -- live tail ------------------------------------------------------------
 
     async def subscribe(self) -> AsyncIterator[Record]:
+        """Yield records as they are appended (a live tail for monitoring)."""
         queue: asyncio.Queue[Record] = asyncio.Queue()
         self._subscribers[queue] = asyncio.get_running_loop()
         try:
@@ -99,4 +103,5 @@ class SQLiteStore:
             self._subscribers.pop(queue, None)
 
     def close(self) -> None:
+        """Close the underlying SQLite connection."""
         self._conn.close()

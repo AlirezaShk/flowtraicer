@@ -27,10 +27,12 @@ def create_app(store) -> FastAPI:
 
     @app.get("/api/engagements")
     def list_engagements():
+        """List one summary row per engagement."""
         return [s.model_dump(mode="json") for s in store.list_engagements()]
 
     @app.get("/api/engagements/{engagement_id}")
     def get_engagement(engagement_id: str):
+        """Return one full engagement tree (steps, events, topology)."""
         try:
             return store.get_engagement(engagement_id).model_dump(mode="json")
         except KeyError as exc:
@@ -38,6 +40,7 @@ def create_app(store) -> FastAPI:
 
     @app.get("/api/engagements/{engagement_id}/timeline")
     def get_timeline(engagement_id: str):
+        """Return the temporal viewmodel (lanes + marks) for the timeline view."""
         try:
             engagement = store.get_engagement(engagement_id)
         except KeyError as exc:
@@ -46,6 +49,7 @@ def create_app(store) -> FastAPI:
 
     @app.websocket("/api/stream")
     async def stream(ws: WebSocket):
+        """Push records to the client as they are appended (live monitoring)."""
         await ws.accept()
         try:
             async for record in store.subscribe():
@@ -76,6 +80,7 @@ def build_default_app() -> tuple[FastAPI, SQLiteStore]:
 
 
 def main() -> None:  # pragma: no cover - thin CLI entry point
+    """Serve the demo-seeded viewer (the ``xai-server`` console script)."""
     import os
 
     import uvicorn

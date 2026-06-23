@@ -59,6 +59,7 @@ class Recorder:
         metadata: dict | None = None,
         topology: Topology | None = None,
     ) -> str:
+        """Begin an engagement; return its id. Put ``user_id``/``session_id`` in ``metadata``."""
         engagement_id = _new_id()
         self._append(
             EngagementStarted(
@@ -79,6 +80,7 @@ class Recorder:
         is_global: bool = False,
         parent: str | None = None,
     ) -> str:
+        """Begin a step within an engagement; return its id."""
         step_id = _new_id()
         self._step_engagement[step_id] = engagement_id
         self._append(
@@ -104,6 +106,7 @@ class Recorder:
         error: str | None = None,
         tokens: TokenUsage | None = None,
     ) -> None:
+        """Record an event of any :class:`EventKind` against ``step_id``."""
         engagement_id = self._step_engagement.get(step_id, "")
         event = StepEvent(
             step_id=step_id,
@@ -139,6 +142,7 @@ class Recorder:
         )
 
     def record_extraction(self, step_id: str, extraction: Extraction) -> None:
+        """Record a step's structured extraction (also surfaced as a timeline event)."""
         engagement_id = self._step_engagement.get(step_id, "")
         self._append(
             ExtractionRecorded(engagement_id=engagement_id, step_id=step_id, extraction=extraction)
@@ -154,6 +158,7 @@ class Recorder:
     def record_intent_switch(
         self, engagement_id: str, *, to_step: str, reason: str, from_step: str | None = None
     ) -> None:
+        """Record a global-step re-route of the engagement's intent."""
         self._append(
             IntentSwitched(
                 engagement_id=engagement_id,
@@ -168,6 +173,7 @@ class Recorder:
         *,
         duration_ms: float | None = None,
     ) -> None:
+        """Close a step with a final status and optional measured duration."""
         engagement_id = self._step_engagement.get(step_id, "")
         self._append(
             StepEnded(
@@ -185,6 +191,7 @@ class Recorder:
         *,
         dropped_at: str | None = None,
     ) -> None:
+        """Close an engagement; for ABANDONED, ``dropped_at`` names the last step reached."""
         self._append(
             EngagementEnded(engagement_id=engagement_id, status=status, dropped_at=dropped_at)
         )

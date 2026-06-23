@@ -29,6 +29,8 @@ def _now() -> datetime:
 
 
 class EngagementStatus(str, Enum):
+    """Lifecycle state of an engagement."""
+
     ACTIVE = "active"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -55,6 +57,8 @@ class TokenUsage(BaseModel):
 
 
 class StepStatus(str, Enum):
+    """Lifecycle state of a single step."""
+
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -62,6 +66,8 @@ class StepStatus(str, Enum):
 
 
 class EventKind(str, Enum):
+    """The kind of thing an event records inside a step."""
+
     LLM_CALL = "llm_call"
     TOOL_CALL = "tool_call"
     EXTRACTION = "extraction"

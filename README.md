@@ -13,7 +13,7 @@ You build your agent as a [LangGraph](https://github.com/langchain-ai/langgraph)
 
 An engagement is a three-level tree:
 
-```
+```text
 Engagement  →  Step (one workflow node)  →  Events (llm_call / tool_call / extraction / log / error)
 ```
 
@@ -203,6 +203,7 @@ The API behind the viewer:
 | `xai.recorder` | the fail-open emit contract |
 | `xai.langgraph_adapter` | `run_instrumented` + `read_topology` |
 | `xai.extraction` | Instructor-powered per-step schema extraction |
+| `xai.analytics` | cross-engagement funnels, drop-off, journey grouping |
 | `xai.timeline` | temporal viewmodel for the timeline view |
 | `xai.server` | FastAPI query + live-stream API and the viewer |
 
@@ -211,9 +212,10 @@ recorder's small emit API, so other engines can be added as adapters later.
 
 ## Status & roadmap
 
-Working skeleton + Instructor extraction + linked graph/timeline viewer. Planned:
-Postgres/Redis store adapters, audit retention, an orchestration DSL. See
-[`docs/`](docs/).
+Done: trace core + SQLite store, LangGraph auto-instrumentation, Instructor extraction,
+**per-step token cost**, **goals/abandonment + drop-off analytics**, and the linked
+graph/timeline viewer. Planned: Postgres/Redis store adapters, audit retention, an
+orchestration DSL. See [`docs/`](docs/).
 
 ## License
 

@@ -34,6 +34,8 @@ class _BaseRecord(BaseModel):
 
 
 class EngagementStarted(_BaseRecord):
+    """An engagement began (carries its name, metadata, and static topology)."""
+
     type: Literal["engagement_started"] = "engagement_started"
     name: str
     metadata: dict = Field(default_factory=dict)
@@ -41,6 +43,8 @@ class EngagementStarted(_BaseRecord):
 
 
 class StepStarted(_BaseRecord):
+    """A step (workflow node) began."""
+
     type: Literal["step_started"] = "step_started"
     step_id: str
     name: str
@@ -50,22 +54,30 @@ class StepStarted(_BaseRecord):
 
 
 class EventRecorded(_BaseRecord):
+    """An event occurred inside a step."""
+
     type: Literal["event_recorded"] = "event_recorded"
     event: StepEvent
 
 
 class ExtractionRecorded(_BaseRecord):
+    """A step produced a structured extraction."""
+
     type: Literal["extraction_recorded"] = "extraction_recorded"
     step_id: str
     extraction: Extraction
 
 
 class IntentSwitched(_BaseRecord):
+    """A global step re-routed the engagement's intent."""
+
     type: Literal["intent_switched"] = "intent_switched"
     intent_switch: IntentSwitch
 
 
 class StepEnded(_BaseRecord):
+    """A step finished (with its final status and measured duration)."""
+
     type: Literal["step_ended"] = "step_ended"
     step_id: str
     status: StepStatus = StepStatus.COMPLETED
@@ -74,6 +86,8 @@ class StepEnded(_BaseRecord):
 
 
 class EngagementEnded(_BaseRecord):
+    """An engagement finished (with final status and, if abandoned, the drop-off step)."""
+
     type: Literal["engagement_ended"] = "engagement_ended"
     status: EngagementStatus = EngagementStatus.COMPLETED
     ended_at: datetime = Field(default_factory=_now)
