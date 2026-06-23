@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>xai — engagement viewer</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>xai</h1>
+    <span class="tagline">engagement viewer · walking skeleton</span>
+    <span id="live" class="live-dot" title="live stream">live</span>
+  </header>
+
+  <main>
+    <aside id="sidebar">
+      <h2>Engagements</h2>
+      <ul id="engagement-list"></ul>
+    </aside>
+
+    <section id="graph-pane">
+      <div id="graph"></div>
+      <div id="legend">
+        <span><i class="swatch executed"></i> executed</span>
+        <span><i class="swatch idle"></i> not taken</span>
+        <span><i class="swatch global"></i> global step</span>
+        <span><i class="swatch failed"></i> failed</span>
+      </div>
+    </section>
+
+    <aside id="detail">
+      <h2 id="detail-title">Select a node</h2>
+      <div id="detail-body" class="muted">Pick an engagement, then click a step.</div>
+      <h2>Live records</h2>
+      <ul id="stream-log"></ul>
+    </aside>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
