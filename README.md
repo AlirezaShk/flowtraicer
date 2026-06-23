@@ -49,11 +49,12 @@ from xai.recorder import Recorder
 from xai.langgraph_adapter import run_instrumented
 
 
-# 1. Build your agent as a normal LangGraph graph.
-class State(TypedDict):
-    messages: Annotated[list, add]
-    tool_calls: Annotated[list, add]   # optional: see "enriching a step" below
-    extraction: dict                   # optional
+# 1. Build your agent as a normal LangGraph graph. Extend TraceState so you don't
+#    redeclare xai's channels (tool_calls / llm_calls / events / extraction) yourself.
+from xai.langgraph_adapter import TraceState
+
+class State(TraceState):
+    messages: Annotated[list, add]     # your own domain fields
 
 def greet(state):  return {"messages": ["hi, what are you looking for?"]}
 def search(state): return {"messages": ["here are 3 options"],
