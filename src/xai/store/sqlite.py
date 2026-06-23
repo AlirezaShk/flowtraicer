@@ -102,6 +102,12 @@ class SQLiteStore:
         finally:
             self._subscribers.pop(queue, None)
 
+    def purge(self, engagement_id: str) -> bool:
+        """Delete an entire engagement (retention). Returns True if it existed."""
+        cur = self._conn.execute("DELETE FROM records WHERE engagement_id = ?", (engagement_id,))
+        self._conn.commit()
+        return cur.rowcount > 0
+
     def close(self) -> None:
         """Close the underlying SQLite connection."""
         self._conn.close()

@@ -91,6 +91,13 @@ class RedisStore:
         summaries = (EngagementSummary.from_engagement(self.get_engagement(i)) for i in ids)
         return [s for s in summaries if matches(s.metadata, where)]
 
+    def purge(self, engagement_id: str) -> bool:
+        """Delete an entire engagement (retention). Returns True if it existed."""
+        existed = bool(self._client.exists(self._eng_key(engagement_id)))
+        self._client.delete(self._eng_key(engagement_id))
+        self._client.lrem(self._ids_key, 0, engagement_id)
+        return existed
+
     # -- live tail ------------------------------------------------------------
 
     def _get_async_client(self):

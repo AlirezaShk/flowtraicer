@@ -105,6 +105,13 @@ class PostgresStore:
         finally:
             await aconn.close()
 
+    def purge(self, engagement_id: str) -> bool:
+        """Delete an entire engagement (retention). Returns True if it existed."""
+        cur = self._conn.execute(
+            f"DELETE FROM {self._table} WHERE engagement_id = %s", (engagement_id,)
+        )
+        return cur.rowcount > 0
+
     def close(self) -> None:
         """Close the underlying connection."""
         self._conn.close()

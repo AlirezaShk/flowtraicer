@@ -67,6 +67,16 @@ def test_pg_get_unknown_raises():
         store.get_engagement("nope")
 
 
+def test_pg_purge_removes_engagement():
+    store = _pg_store()
+    for rec in _stream("e1"):
+        store.append(rec)
+    assert store.purge("e1") is True
+    with pytest.raises(KeyError):
+        store.get_engagement("e1")
+    assert store.purge("e1") is False
+
+
 def test_pg_list_engagements_with_metadata_filter():
     store = _pg_store()
     for rec in _stream("e1", user_id="u1"):

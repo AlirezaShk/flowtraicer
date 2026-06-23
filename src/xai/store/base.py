@@ -69,5 +69,8 @@ class Store(Protocol):
     def list_engagements(self, where: dict | None = None) -> list[EngagementSummary]:
         """Return a summary per engagement (oldest first), optionally filtered by metadata."""
 
+    def purge(self, engagement_id: str) -> bool:
+        """Delete an entire engagement (retention). Returns True if it existed."""
+
     def subscribe(self) -> AsyncIterator[Record]:
         """Yield records as they are appended (for live monitoring)."""
