@@ -162,6 +162,27 @@ return {"extraction": result.as_record().model_dump()}
 extractor.extract_and_record(recorder, step_id, BudgetInfo, "Shibuya, around ¥95,000")
 ```
 
+## Storage backends
+
+The `Store` is pluggable (append-only: write a record, reconstruct an engagement, list
+summaries, subscribe to a live tail). Pick by environment — the trace, viewer, and analytics
+work identically on all three:
+
+```python
+from xai.store.sqlite import SQLiteStore      # default; zero deps, file or :memory:
+store = SQLiteStore("traces.db")
+
+from xai.store.redis import RedisStore         # pip install -e ".[redis]"
+store = RedisStore("redis://localhost:6379")   # Redis Streams; live tail across processes
+
+from xai.store.postgres import PostgresStore   # pip install -e ".[postgres]"
+store = PostgresStore("postgresql://localhost/xai")  # durable JSONB + LISTEN/NOTIFY
+```
+
+- **SQLite** — local dev, single process, audit-friendly append-only file.
+- **Redis** — cross-process live monitoring (recorder and viewer can be separate services).
+- **Postgres** — durable + queryable for production, with `LISTEN/NOTIFY` live updates.
+
 ## Analytics: funnels & journeys
 
 Across many engagements (tag each with `user_id`/`session_id` in `metadata`), answer
