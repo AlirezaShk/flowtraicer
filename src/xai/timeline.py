@@ -37,6 +37,7 @@ class TimelineLane(BaseModel):
     status: StepStatus
     offset_ms: float
     duration_ms: float
+    total_tokens: int = 0
     events: list[TimelineMark] = Field(default_factory=list)
 
 
@@ -45,6 +46,7 @@ class TimelineView(BaseModel):
 
     engagement_id: str
     total_ms: float
+    total_tokens: int = 0
     lanes: list[TimelineLane] = Field(default_factory=list)
     intent_switches: list[TimelineMark] = Field(default_factory=list)
 
@@ -86,6 +88,7 @@ def build_timeline(engagement: Engagement) -> TimelineView:
                 status=step.status,
                 offset_ms=offset,
                 duration_ms=duration,
+                total_tokens=step.total_tokens,
                 events=marks,
             )
         )
@@ -102,6 +105,7 @@ def build_timeline(engagement: Engagement) -> TimelineView:
     return TimelineView(
         engagement_id=engagement.id,
         total_ms=span,
+        total_tokens=engagement.total_tokens,
         lanes=lanes,
         intent_switches=switches,
     )

@@ -18,6 +18,7 @@ from .core.model import (
     IntentSwitch,
     StepEvent,
     StepStatus,
+    TokenUsage,
     Topology,
 )
 from .store.records import (
@@ -101,6 +102,7 @@ class Recorder:
         payload: dict | None = None,
         duration_ms: float | None = None,
         error: str | None = None,
+        tokens: TokenUsage | None = None,
     ) -> None:
         engagement_id = self._step_engagement.get(step_id, "")
         event = StepEvent(
@@ -110,8 +112,31 @@ class Recorder:
             payload=payload or {},
             duration_ms=duration_ms,
             error=error,
+            tokens=tokens,
         )
         self._append(EventRecorded(engagement_id=engagement_id, event=event))
+
+    def record_llm_call(
+        self,
+        step_id: str,
+        name: str,
+        *,
+        prompt: int = 0,
+        completion: int = 0,
+        total: int = 0,
+        duration_ms: float | None = None,
+        model: str | None = None,
+    ) -> None:
+        """Record an ``llm_call`` event with token usage against ``step_id``."""
+        payload = {"model": model} if model else {}
+        self.record_event(
+            step_id,
+            EventKind.LLM_CALL,
+            name,
+            payload=payload,
+            duration_ms=duration_ms,
+            tokens=TokenUsage(prompt=prompt, completion=completion, total=total),
+        )
 
     def record_extraction(self, step_id: str, extraction: Extraction) -> None:
         engagement_id = self._step_engagement.get(step_id, "")
@@ -154,6 +179,12 @@ class Recorder:
         )
 
     def end_engagement(
-        self, engagement_id: str, status: EngagementStatus = EngagementStatus.COMPLETED
+        self,
+        engagement_id: str,
+        status: EngagementStatus = EngagementStatus.COMPLETED,
+        *,
+        dropped_at: str | None = None,
     ) -> None:
-        self._append(EngagementEnded(engagement_id=engagement_id, status=status))
+        self._append(
+            EngagementEnded(engagement_id=engagement_id, status=status, dropped_at=dropped_at)
+        )

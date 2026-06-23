@@ -77,6 +77,7 @@ class EngagementEnded(_BaseRecord):
     type: Literal["engagement_ended"] = "engagement_ended"
     status: EngagementStatus = EngagementStatus.COMPLETED
     ended_at: datetime = Field(default_factory=_now)
+    dropped_at: str | None = None
 
 
 Record = Annotated[

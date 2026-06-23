@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 def _new_id() -> str:
@@ -32,6 +32,26 @@ class EngagementStatus(str, Enum):
     ACTIVE = "active"
     COMPLETED = "completed"
     FAILED = "failed"
+    #: The engagement ended without reaching a declared goal node (a drop-off).
+    ABANDONED = "abandoned"
+
+
+class TokenUsage(BaseModel):
+    """LLM token usage for a single call.
+
+    ``total`` defaults to ``prompt + completion`` when not given explicitly, so providers
+    that report only a grand total (or only the split) both work.
+    """
+
+    prompt: int = 0
+    completion: int = 0
+    total: int = 0
+
+    @model_validator(mode="after")
+    def _default_total(self) -> TokenUsage:
+        if self.total == 0 and (self.prompt or self.completion):
+            self.total = self.prompt + self.completion
+        return self
 
 
 class StepStatus(str, Enum):
@@ -60,6 +80,8 @@ class StepEvent(BaseModel):
     duration_ms: float | None = None
     payload: dict = Field(default_factory=dict)
     error: str | None = None
+    #: Token usage, for ``llm_call`` events. None for non-LLM events.
+    tokens: TokenUsage | None = None
 
 
 class Extraction(BaseModel):
@@ -98,6 +120,12 @@ class Step(BaseModel):
     extraction: Extraction | None = None
     events: list[StepEvent] = Field(default_factory=list)
 
+    @computed_field
+    @property
+    def total_tokens(self) -> int:
+        """Sum of token usage across this step's events (0 if none)."""
+        return sum(e.tokens.total for e in self.events if e.tokens)
+
 
 class NodeDef(BaseModel):
     """A node in the static workflow topology."""
@@ -130,7 +158,15 @@ class Engagement(BaseModel):
     status: EngagementStatus = EngagementStatus.ACTIVE
     started_at: datetime = Field(default_factory=_now)
     ended_at: datetime | None = None
+    #: The step the user dropped off at, when ``status`` is ABANDONED.
+    dropped_at: str | None = None
     metadata: dict = Field(default_factory=dict)
     topology: Topology = Field(default_factory=Topology)
     steps: list[Step] = Field(default_factory=list)
     intent_switches: list[IntentSwitch] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def total_tokens(self) -> int:
+        """Sum of token usage across all steps (0 if none)."""
+        return sum(step.total_tokens for step in self.steps)

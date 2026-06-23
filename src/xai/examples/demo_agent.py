@@ -54,35 +54,41 @@ NODE_TOOLS = {"qualify": ["lookup_area"], "search": ["search_properties"]}
 
 
 class DemoState(TypedDict):
-    msgs: Annotated[list, add]
+    messages: Annotated[list, add]
     tool_calls: Annotated[list, add]
+    llm_calls: Annotated[list, add]
     extraction: dict
     route: str
 
 
 def _greet(state: DemoState) -> dict:
-    return {"msgs": ["Hi! Tell me what kind of place you're looking for."]}
+    return {
+        "messages": ["Hi! Tell me what kind of place you're looking for."],
+        "llm_calls": [{"name": "gpt-4o-mini", "prompt_tokens": 28, "completion_tokens": 12}],
+    }
 
 
 def _qualify(state: DemoState) -> dict:
     extractor = Extractor(_StubExtractionClient())
     result = extractor.extract(BudgetInfo, "I'm looking in Shibuya, budget about ¥95,000 a month.")
     return {
-        "msgs": [f"Got it — ¥{result.value.budget:,} in {result.value.area}."],
+        "messages": [f"Got it — ¥{result.value.budget:,} in {result.value.area}."],
         "tool_calls": [{"name": "lookup_area", "payload": {"area": result.value.area}}],
+        "llm_calls": [{"name": "gpt-4o-mini", "prompt_tokens": 64, "completion_tokens": 20}],
         "extraction": result.as_record().model_dump(),
     }
 
 
 def _search(state: DemoState) -> dict:
     return {
-        "msgs": ["I found 3 matching rooms."],
+        "messages": ["I found 3 matching rooms."],
         "tool_calls": [{"name": "search_properties", "payload": {"results": 3}}],
+        "llm_calls": [{"name": "gpt-4o-mini", "prompt_tokens": 90, "completion_tokens": 35}],
     }
 
 
 def _escalate(state: DemoState) -> dict:
-    return {"msgs": ["Connecting you to a human agent."]}
+    return {"messages": ["Connecting you to a human agent."]}
 
 
 def _router(state: DemoState) -> str:
@@ -111,7 +117,7 @@ async def run_demo(recorder: Recorder, *, route: str = "search") -> str:
     """
     return await run_instrumented(
         build_demo_graph(),
-        {"msgs": [], "tool_calls": [], "route": route},
+        {"messages": [], "tool_calls": [], "llm_calls": [], "route": route},
         recorder,
         name=f"demo:{route}",
         metadata={"demo": True, "route": route},

@@ -68,6 +68,7 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var
 .pill.completed { color: var(--executed); border-color: var(--executed); }
 .pill.failed { color: var(--failed); border-color: var(--failed); }
 .pill.active { color: var(--accent); border-color: var(--accent); }
+.pill.abandoned { color: #d29922; border-color: #d29922; }
 
 #graph-pane { position: relative; display: flex; flex-direction: column; }
 #graph { flex: 1; }

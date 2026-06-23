@@ -67,6 +67,7 @@ def fold(records: Iterable[Record]) -> Engagement:
         elif isinstance(rec, EngagementEnded):
             eng.status = rec.status
             eng.ended_at = rec.ended_at
+            eng.dropped_at = rec.dropped_at
 
     if eng is None:
         raise ValueError("empty record stream")

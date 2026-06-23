@@ -4,11 +4,21 @@ Consumes ``compiled.astream(stream_mode="debug")``, which emits a ``task`` chunk
 node is entered and a ``task_result`` chunk when it exits. Each node becomes a
 :class:`Step`; entering a *global* node records an :class:`IntentSwitch`.
 
-To enrich a step, nodes may write two conventional keys to graph state:
+To enrich a step, a node may write these conventional keys to graph state — the runner
+records whatever it finds:
 
-* ``tool_calls``: ``list[{"name": str, "payload": dict}]`` -> recorded as tool-call events.
-* ``extraction``: ``{"schema_name": str, "values": dict, ...}`` -> recorded as the step's
+* ``tool_calls``: ``list[{"name": str, "payload": dict}]`` -> tool-call events.
+* ``llm_calls``: ``list[{"name": str, "prompt_tokens": int, "completion_tokens": int,
+  "total_tokens"?: int, "duration_ms"?: float, "model"?: str}]`` -> llm-call events with
+  token usage (so per-step / per-engagement token cost is captured).
+* ``events``: ``list[{"kind": str, "name": str, "payload"?: dict, "duration_ms"?: float,
+  "tokens"?: {...}, "error"?: str}]`` -> arbitrary typed events.
+* ``extraction``: ``{"schema_name": str, "values": dict, ...}`` -> the step's
   :class:`Extraction`.
+
+Passing ``goal_nodes`` marks the engagement ABANDONED (with ``dropped_at`` set to the last
+step reached) if the run ends without entering any goal node — turning early exits into
+first-class drop-offs.
 """
 
 from __future__ import annotations
@@ -17,7 +27,7 @@ import time
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from ..core.model import EngagementStatus, EventKind, Extraction, StepStatus
+from ..core.model import EngagementStatus, EventKind, Extraction, StepStatus, TokenUsage
 from ..recorder import Recorder
 from .topology import read_topology
 
@@ -43,10 +53,12 @@ async def run_instrumented(
     metadata: dict | None = None,
     global_nodes: Iterable[str] = (),
     node_tools: Mapping[str, list[str]] | None = None,
+    goal_nodes: Iterable[str] = (),
     config: dict | None = None,
 ) -> str:
     """Run ``compiled`` to completion, recording the engagement; return its id."""
     global_set = set(global_nodes)
+    goal_set = set(goal_nodes)
     tools_map = dict(node_tools or {})
 
     topology = read_topology(compiled, global_nodes=global_set, node_tools=tools_map)
@@ -55,6 +67,7 @@ async def run_instrumented(
     # task id -> (step_id, node name, perf-counter start)
     open_tasks: dict[str, tuple[str, str, float]] = {}
     last_completed: str | None = None
+    reached: set[str] = set()
     status = EngagementStatus.COMPLETED
 
     try:
@@ -91,6 +104,27 @@ async def run_instrumented(
                         call.get("name", "tool"),
                         payload=call.get("payload", {}),
                     )
+                for call in result.get("llm_calls") or []:
+                    recorder.record_llm_call(
+                        step_id,
+                        call.get("name", "llm"),
+                        prompt=call.get("prompt_tokens", 0),
+                        completion=call.get("completion_tokens", 0),
+                        total=call.get("total_tokens", 0),
+                        duration_ms=call.get("duration_ms"),
+                        model=call.get("model"),
+                    )
+                for ev in result.get("events") or []:
+                    tokens = ev.get("tokens")
+                    recorder.record_event(
+                        step_id,
+                        EventKind(ev.get("kind", "log")),
+                        ev.get("name", "event"),
+                        payload=ev.get("payload", {}),
+                        duration_ms=ev.get("duration_ms"),
+                        error=ev.get("error"),
+                        tokens=TokenUsage(**tokens) if tokens else None,
+                    )
                 extraction = result.get("extraction")
                 if extraction:
                     recorder.record_extraction(step_id, Extraction(**extraction))
@@ -105,10 +139,16 @@ async def run_instrumented(
                 if error:
                     recorder.record_event(step_id, EventKind.ERROR, "node_error", error=str(error))
                 last_completed = node
+                reached.add(node)
     except Exception as exc:  # the agent itself failed mid-run
         status = EngagementStatus.FAILED
-        recorder.end_engagement(engagement_id, status)
+        recorder.end_engagement(engagement_id, status, dropped_at=last_completed)
         raise exc
 
-    recorder.end_engagement(engagement_id, status)
+    dropped_at: str | None = None
+    if goal_set and not (reached & goal_set):
+        status = EngagementStatus.ABANDONED
+        dropped_at = last_completed
+
+    recorder.end_engagement(engagement_id, status, dropped_at=dropped_at)
     return engagement_id

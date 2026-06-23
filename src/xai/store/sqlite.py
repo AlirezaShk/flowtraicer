@@ -13,7 +13,7 @@ import sqlite3
 from collections.abc import AsyncIterator
 
 from ..core.model import Engagement
-from .base import EngagementSummary
+from .base import EngagementSummary, matches
 from .reconstruct import fold
 from .records import Record, RecordAdapter
 
@@ -80,11 +80,12 @@ class SQLiteStore:
             raise KeyError(engagement_id)
         return fold(records)
 
-    def list_engagements(self) -> list[EngagementSummary]:
+    def list_engagements(self, where: dict | None = None) -> list[EngagementSummary]:
         ids = self._conn.execute(
             "SELECT engagement_id FROM records GROUP BY engagement_id ORDER BY MIN(seq)"
         ).fetchall()
-        return [EngagementSummary.from_engagement(self.get_engagement(i[0])) for i in ids]
+        summaries = (EngagementSummary.from_engagement(self.get_engagement(i[0])) for i in ids)
+        return [s for s in summaries if matches(s.metadata, where)]
 
     # -- live tail ------------------------------------------------------------
 

@@ -14,10 +14,11 @@ async function loadEngagements() {
   list.reverse().forEach((e) => {
     const li = document.createElement("li");
     li.dataset.id = e.id;
+    const drop = e.dropped_at ? ` · dropped @ ${esc(e.dropped_at)}` : "";
     li.innerHTML =
       `<div class="eng-name">${esc(e.name)}</div>` +
-      `<div class="eng-meta">${e.step_count} steps · ` +
-      `<span class="pill ${e.status}">${e.status}</span></div>`;
+      `<div class="eng-meta">${e.step_count} steps · ${e.total_tokens} tok · ` +
+      `<span class="pill ${e.status}">${e.status}</span>${drop}</div>`;
     li.onclick = () => selectEngagement(e.id, li);
     ul.appendChild(li);
   });
@@ -110,7 +111,7 @@ function renderTimeline(tv) {
   const total = tv.total_ms || 1;
   const el = $("#timeline");
   el.innerHTML = "";
-  $("#timeline-total").textContent = `${tv.total_ms.toFixed(2)} ms`;
+  $("#timeline-total").textContent = `${tv.total_ms.toFixed(2)} ms · ${tv.total_tokens} tok`;
 
   if (tv.intent_switches.length) {
     const row = document.createElement("div");
@@ -185,6 +186,7 @@ function showStep(step, name) {
   const rows = [
     ["status", step.status],
     ["duration", step.duration_ms != null ? step.duration_ms.toFixed(2) + " ms" : "—"],
+    ["tokens", step.total_tokens],
     ["global", step.is_global ? "yes" : "no"],
     ["tools", step.tools_available.join(", ") || "—"],
   ];
@@ -196,7 +198,8 @@ function showStep(step, name) {
   }
   html += `<h2>Events (${step.events.length})</h2>`;
   step.events.forEach((ev) => {
-    html += `<div class="event ${ev.kind}"><div class="k">${ev.kind} · ${esc(ev.name)}</div>` +
+    const tok = ev.tokens ? ` · ${ev.tokens.total} tok` : "";
+    html += `<div class="event ${ev.kind}"><div class="k">${ev.kind} · ${esc(ev.name)}${tok}</div>` +
       (Object.keys(ev.payload || {}).length ? `<pre>${esc(JSON.stringify(ev.payload, null, 2))}</pre>` : "") +
       (ev.error ? `<pre>${esc(ev.error)}</pre>` : "") + `</div>`;
   });
