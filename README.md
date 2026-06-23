@@ -5,31 +5,107 @@
 An independent Python library to **map, visualize, monitor, debug, log, and audit** the
 steps of an engagement between a user and an agentic AI system.
 
-`xai` models an engagement as a three-level tree:
+You build your agent as a [LangGraph](https://github.com/langchain-ai/langgraph) graph;
+`xai` captures each run as a structured, append-only trace and renders it as a linked
+**graph + timeline** in a browser.
+
+## The model
+
+An engagement is a three-level tree:
 
 ```
-Engagement  →  Step (workflow node)  →  Events (llm_call / tool_call / extraction / log / error)
+Engagement  →  Step (one workflow node)  →  Events (llm_call / tool_call / extraction / log / error)
 ```
 
-Steps carry **per-step tools** and a **per-step extraction schema**, and **global steps**
-can re-route the whole intent mid-engagement. The library captures all of this from a
-[LangGraph](https://github.com/langchain-ai/langgraph) run, stores it in an append-only
-trace, and renders it as a linked **graph + timeline** in a browser viewer.
+- **Engagement** — one whole user↔agent session. Carries free-form `metadata` (put your
+  `user_id`, `session_id`, etc. here).
+- **Step** — one LangGraph node execution. Has a status, timing, the **tools available** to
+  it, and an optional **per-step extraction** (a Pydantic schema pulled from the turn).
+- **Event** — something that happened inside a step (a tool call, an LLM call, a log line,
+  an error, an extraction).
+- **Global step** — a node that can fire from anywhere and re-route the workflow's intent
+  (e.g. "escalate to a human"). Entering one records an **intent switch**.
 
-## Status: walking skeleton
+## Install
 
-This is the first vertical slice (see [`docs/`](docs/)). It proves the full pipe end to
-end on one LangGraph run:
+```bash
+pip install -e ".[dev]"            # core + test deps
+pip install -e ".[extraction,openai]"   # + Instructor extraction with the OpenAI SDK
+```
 
-- `core/model` — the complete Pydantic data model.
-- `store` — append-only trace store (default: **SQLite + in-process pub/sub**).
-- `recorder` — the fail-open emit contract.
-- `langgraph_adapter` — auto-instruments a LangGraph run into the trace.
-- `extraction` — **Instructor + Pydantic** per-step schema extraction, provider-agnostic.
-- `server` — FastAPI query + live-stream API.
-- `viewer` — Cytoscape.js **graph view** with the executed path highlighted.
+(Requires Python ≥ 3.11. The package imports as `xai` regardless of the `src/` layout.)
 
-### Per-step schema extraction
+## Getting started: instrument a LangGraph agent
+
+```python
+import asyncio
+from typing import Annotated, TypedDict
+from operator import add
+
+from langgraph.graph import StateGraph, START, END
+
+from xai.store.sqlite import SQLiteStore
+from xai.recorder import Recorder
+from xai.langgraph_adapter import run_instrumented
+
+
+# 1. Build your agent as a normal LangGraph graph.
+class State(TypedDict):
+    messages: Annotated[list, add]
+    tool_calls: Annotated[list, add]   # optional: see "enriching a step" below
+    extraction: dict                   # optional
+
+def greet(state):  return {"messages": ["hi, what are you looking for?"]}
+def search(state): return {"messages": ["here are 3 options"],
+                           "tool_calls": [{"name": "search_db", "payload": {"hits": 3}}]}
+
+g = StateGraph(State)
+g.add_node("greet", greet)
+g.add_node("search", search)
+g.add_edge(START, "greet")
+g.add_edge("greet", "search")
+g.add_edge("search", END)
+app = g.compile()
+
+
+# 2. Pick a store. SQLite is the zero-dependency default; pass a path to persist.
+store = SQLiteStore("traces.db")
+recorder = Recorder(store)
+
+# 3. Run it under instrumentation. Everything the run does is recorded.
+engagement_id = asyncio.run(run_instrumented(
+    app,
+    {"messages": [], "tool_calls": []},
+    recorder,
+    name="house_search",
+    metadata={"user_id": "u-42", "session_id": "s-1"},   # tag the journey
+    global_nodes={"escalate"},          # nodes that re-route intent
+    node_tools={"search": ["search_db"]},  # tools available per step
+))
+
+# 4. Read the trace back.
+engagement = store.get_engagement(engagement_id)
+for step in engagement.steps:
+    print(step.name, step.status, f"{step.duration_ms:.1f}ms",
+          [e.name for e in step.events])
+```
+
+### Enriching a step from inside a node
+
+`run_instrumented` records node entry/exit, timing, and intent switches automatically. To
+also capture **tool calls** and a **per-step extraction**, a node may write two
+conventional keys to graph state — the runner records whatever it finds:
+
+```python
+def qualify(state):
+    return {
+        "messages": ["got it"],
+        "tool_calls": [{"name": "lookup_area", "payload": {"area": "Shibuya"}}],
+        "extraction": {"schema_name": "BudgetInfo", "values": {"budget": 95000}},
+    }
+```
+
+### Per-step schema extraction (Instructor + Pydantic)
 
 ```python
 from pydantic import BaseModel
@@ -42,33 +118,59 @@ class BudgetInfo(BaseModel):
 extractor = Extractor.from_provider("openai/gpt-4o-mini")   # or anthropic/… , google/…
 result = extractor.extract(BudgetInfo, "Shibuya, around ¥95,000")
 
-# LangGraph happy path: write the record to state; the runner records it.
+# inside a node — record-via-state (the runner picks it up):
 return {"extraction": result.as_record().model_dump()}
-# Manual: extractor.extract_and_record(recorder, step_id, BudgetInfo, "...")
+# anywhere else — record directly:
+extractor.extract_and_record(recorder, step_id, BudgetInfo, "Shibuya, around ¥95,000")
 ```
 
-Install a provider SDK alongside the extra: `pip install -e ".[extraction,openai]"`.
+## Viewing traces
 
-See the design doc for the deferred roadmap (timeline view, Instructor-powered extraction,
-Postgres/Redis adapters, audit retention, orchestration DSL).
-
-## Why it's framework-agnostic at the core
-
-The trace core knows nothing about LangGraph — the adapter feeds it through a small emit
-API. LangGraph is the v1 happy path; other engines can be added as adapters.
-
-## Quickstart (dev)
+The viewer is a FastAPI app + a Cytoscape.js single page (graph on top, timeline below,
+linked). To explore the bundled demo:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,extraction]"
-pytest
-python -m xai.server.app          # serve the viewer + API at http://localhost:8000
+python -m xai.server.app        # http://127.0.0.1:8400
 ```
 
-## Design
+To view **your own** store, build the app around it:
 
-- [`docs/2026-06-23-xai-walking-skeleton-design.md`](docs/2026-06-23-xai-walking-skeleton-design.md)
+```python
+import uvicorn
+from xai.server.app import create_app
+
+uvicorn.run(create_app(SQLiteStore("traces.db")), host="127.0.0.1", port=8400)
+```
+
+The API behind the viewer:
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/engagements` | one summary row per engagement |
+| `GET /api/engagements/{id}` | the full engagement tree (+ topology) |
+| `GET /api/engagements/{id}/timeline` | the temporal viewmodel (lanes, marks) |
+| `WS  /api/stream` | records pushed live as they're appended |
+
+## Architecture
+
+| Module | Responsibility |
+|---|---|
+| `xai.core.model` | the Pydantic data model (framework-agnostic) |
+| `xai.store` | append-only `Store` protocol + SQLite default backend |
+| `xai.recorder` | the fail-open emit contract |
+| `xai.langgraph_adapter` | `run_instrumented` + `read_topology` |
+| `xai.extraction` | Instructor-powered per-step schema extraction |
+| `xai.timeline` | temporal viewmodel for the timeline view |
+| `xai.server` | FastAPI query + live-stream API and the viewer |
+
+The trace **core knows nothing about LangGraph** — the adapter feeds it through the
+recorder's small emit API, so other engines can be added as adapters later.
+
+## Status & roadmap
+
+Working skeleton + Instructor extraction + linked graph/timeline viewer. Planned:
+Postgres/Redis store adapters, audit retention, an orchestration DSL. See
+[`docs/`](docs/).
 
 ## License
 
