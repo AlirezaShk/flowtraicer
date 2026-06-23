@@ -1,7 +1,7 @@
 """The recorder — the emit contract every instrumentation source calls.
 
 It turns high-level calls (``start_step``, ``record_event`` …) into append-only records
-on a :class:`~xai.store.base.Store`. Every method is **fail-open**: a failure to record
+on a :class:`Store`. Every method is **fail-open**: a failure to record
 is logged and swallowed, never raised into the caller — observability must not crash the
 observed agent.
 """
@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from uuid import uuid4
 
-from xai.core.model import (
+from .core.model import (
     EngagementStatus,
     EventKind,
     Extraction,
@@ -20,7 +20,7 @@ from xai.core.model import (
     StepStatus,
     Topology,
 )
-from xai.store.records import (
+from .store.records import (
     EngagementEnded,
     EngagementStarted,
     EventRecorded,
@@ -30,7 +30,7 @@ from xai.store.records import (
     StepStarted,
 )
 
-logger = logging.getLogger("xai.recorder")
+logger = logging.getLogger(__name__)
 
 
 def _new_id() -> str:
@@ -49,7 +49,7 @@ class Recorder:
         try:
             self._store.append(record)
         except Exception:
-            logger.warning("xai: failed to record %s", type(record).__name__, exc_info=True)
+            logger.warning("failed to record %s", type(record).__name__, exc_info=True)
 
     def start_engagement(
         self,

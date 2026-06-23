@@ -5,7 +5,7 @@ Workflow::
     greet -> qualify -> (router) -> search        (happy path)
                                  \\-> escalate     (global re-route)
 
-``qualify`` runs the Instructor-powered :class:`~xai.extraction.Extractor` to pull a
+``qualify`` runs the Instructor-powered :class:`Extractor` to pull a
 ``BudgetInfo`` schema, then writes ``result.as_record()`` to state under ``extraction`` —
 the record-via-state path the runner records automatically. ``escalate`` is a *global*
 step: routing into it records an intent switch.
@@ -23,9 +23,9 @@ from typing import Annotated, TypedDict
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel
 
-from xai.extraction import Extractor
-from xai.langgraph_adapter import run_instrumented
-from xai.recorder import Recorder
+from ..extraction import Extractor
+from ..langgraph_adapter import run_instrumented
+from ..recorder import Recorder
 
 
 class BudgetInfo(BaseModel):

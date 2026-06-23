@@ -17,9 +17,9 @@ import time
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from xai.core.model import EngagementStatus, EventKind, Extraction, StepStatus
-from xai.langgraph_adapter.topology import read_topology
-from xai.recorder import Recorder
+from ..core.model import EngagementStatus, EventKind, Extraction, StepStatus
+from ..recorder import Recorder
+from .topology import read_topology
 
 
 def _as_dict(result: Any) -> dict:

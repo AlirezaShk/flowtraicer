@@ -12,12 +12,12 @@ import logging
 import sqlite3
 from collections.abc import AsyncIterator
 
-from xai.core.model import Engagement
-from xai.store.base import EngagementSummary
-from xai.store.reconstruct import fold
-from xai.store.records import Record, RecordAdapter
+from ..core.model import Engagement
+from .base import EngagementSummary
+from .reconstruct import fold
+from .records import Record, RecordAdapter
 
-logger = logging.getLogger("xai.store.sqlite")
+logger = logging.getLogger(__name__)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS records (

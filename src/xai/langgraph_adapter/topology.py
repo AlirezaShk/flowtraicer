@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 
-from xai.core.model import EdgeDef, NodeDef, Topology
+from ..core.model import EdgeDef, NodeDef, Topology
 
 # LangGraph's synthetic entry/exit nodes — not part of the authored workflow.
 _SYNTHETIC = {"__start__", "__end__"}

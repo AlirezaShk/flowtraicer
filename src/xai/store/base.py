@@ -12,8 +12,8 @@ from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
-from xai.core.model import Engagement, EngagementStatus
-from xai.store.records import Record
+from ..core.model import Engagement, EngagementStatus
+from .records import Record
 
 
 class EngagementSummary(BaseModel):

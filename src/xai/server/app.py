@@ -15,7 +15,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
-from xai.store.sqlite import SQLiteStore
+from ..store.sqlite import SQLiteStore
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
@@ -52,8 +52,8 @@ def build_default_app() -> tuple[FastAPI, SQLiteStore]:
     """An in-memory store seeded with both demo runs, plus its app (for ``xai-server``)."""
     import asyncio
 
-    from xai.examples.demo_agent import run_demo
-    from xai.recorder import Recorder
+    from ..examples.demo_agent import run_demo
+    from ..recorder import Recorder
 
     store = SQLiteStore()
     recorder = Recorder(store)

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from xai.core.model import Engagement, Step
-from xai.store.records import (
+from ..core.model import Engagement, Step
+from .records import (
     EngagementEnded,
     EngagementStarted,
     EventRecorded,

@@ -1,7 +1,7 @@
 """Instructor-powered, provider-agnostic per-step schema extraction.
 
 Declare a Pydantic schema, hand the model some text, get back a validated instance plus
-an :class:`~xai.core.model.Extraction` ready to drop into the trace.
+an :class:`Extraction` ready to drop into the trace.
 
 The provider abstraction is Instructor's own :func:`instructor.from_provider` — the same
 code targets OpenAI / Anthropic / Gemini by changing only the model string
@@ -25,8 +25,8 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 
-from xai.core.model import Extraction
-from xai.recorder import Recorder
+from .core.model import Extraction
+from .recorder import Recorder
 
 T = TypeVar("T", bound=BaseModel)
 

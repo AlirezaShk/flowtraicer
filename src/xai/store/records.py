@@ -1,7 +1,7 @@
 """Append-only delta records — the store's source of truth.
 
 The whole engagement tree is reconstructed by folding an ordered stream of these
-records (see :mod:`xai.store.reconstruct`). Keeping the log append-only gives audit
+records (see :mod:`.reconstruct`). Keeping the log append-only gives audit
 integrity and replay for free, and lets any backend reuse the same fold logic.
 """
 
@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-from xai.core.model import (
+from ..core.model import (
     EngagementStatus,
     Extraction,
     IntentSwitch,
