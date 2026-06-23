@@ -125,6 +125,24 @@ await run_instrumented(app, state, recorder,
                        goal_nodes={"submitted"})   # didn't reach it -> ABANDONED
 ```
 
+### Free-form LLM calls, any provider (LiteLLM)
+
+xai's core only *records* tokens. For the calls themselves, the optional `xai.llm` helper
+wraps [LiteLLM](https://docs.litellm.ai) so one config targets any provider — and returns
+token usage that drops into `llm_calls`:
+
+```python
+from xai.llm import LiteLLMClient
+
+llm = LiteLLMClient(provider="openai", model="gpt-5-nano", api_key="XXX")
+# or from a config blob: LiteLLMClient.from_config({"llm_provider": "openai", "model": "...", "key": "..."})
+
+result = llm.complete("Summarize this for the applicant.")
+return {"messages": [result.text], "llm_calls": [result.as_llm_call()]}  # token cost recorded
+```
+
+Install with the `litellm` extra. (Structured extraction uses Instructor; see below.)
+
 ### Per-step schema extraction (Instructor + Pydantic)
 
 ```python

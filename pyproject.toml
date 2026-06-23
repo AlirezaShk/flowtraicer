@@ -24,6 +24,8 @@ dependencies = [
 # Schema extraction. Instructor's `from_provider` is the multi-provider abstraction;
 # install the SDK for the provider you target (extras below, or all via `providers`).
 extraction = ["instructor>=1.0"]
+# Config-driven multi-provider LLM calls (xai.llm.LiteLLMClient).
+litellm = ["litellm>=1.40"]
 openai = ["openai>=1.0"]
 anthropic = ["anthropic>=0.40"]
 google = ["google-genai>=1.0"]
