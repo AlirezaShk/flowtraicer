@@ -76,6 +76,45 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var
   background: var(--panel); font-size: 12px; color: var(--muted);
 }
 #legend span { display: flex; align-items: center; gap: 6px; }
+
+/* Timeline (lower half of the centre pane) */
+#timeline-pane {
+  height: 240px; flex: none; display: flex; flex-direction: column;
+  border-top: 1px solid var(--border); background: var(--panel);
+}
+#timeline-header {
+  display: flex; justify-content: space-between; padding: 8px 16px;
+  font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+#timeline { flex: 1; overflow-y: auto; padding: 8px 16px 16px; position: relative; }
+.tl-lane { display: flex; align-items: center; height: 26px; gap: 8px; }
+.tl-label {
+  width: 96px; flex: none; text-align: right; font-size: 12px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+}
+.tl-track { position: relative; flex: 1; height: 16px; background: var(--bg); border-radius: 3px; }
+.tl-bar {
+  position: absolute; top: 0; height: 16px; min-width: 4px; border-radius: 3px;
+  background: var(--idle); cursor: pointer; border: 1px solid transparent;
+}
+.tl-bar.executed { background: var(--executed); }
+.tl-bar.failed { background: var(--failed); }
+.tl-bar.global { background: var(--global); }
+.tl-lane.sel .tl-bar { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.tl-lane.sel .tl-label { color: var(--accent); }
+.tl-mark {
+  position: absolute; top: 2px; width: 6px; height: 12px; border-radius: 2px;
+  background: var(--accent); transform: translateX(-50%); opacity: 0.85;
+}
+.tl-mark.extraction { background: var(--global); }
+.tl-mark.error { background: var(--failed); }
+.tl-switch {
+  position: absolute; top: 8px; bottom: 8px; width: 0; border-left: 2px dashed var(--global);
+  transform: translateX(-50%); pointer-events: none;
+}
+.tl-switch-row { position: relative; height: 14px; margin-left: 104px; }
+
 .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 .swatch.executed { background: var(--executed); }
 .swatch.idle { background: var(--idle); }

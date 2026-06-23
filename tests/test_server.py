@@ -64,6 +64,25 @@ def test_stream_endpoint_pushes_appended_records():
         assert msg["engagement_id"] == "live1"
 
 
+def test_timeline_endpoint_returns_lanes():
+    store = SQLiteStore()
+    _seed(store)
+    client = TestClient(create_app(store))
+
+    resp = client.get("/api/engagements/e1/timeline")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["engagement_id"] == "e1"
+    assert "total_ms" in body
+    assert body["lanes"][0]["name"] == "greet"
+
+
+def test_timeline_unknown_engagement_returns_404():
+    store = SQLiteStore()
+    client = TestClient(create_app(store))
+    assert client.get("/api/engagements/nope/timeline").status_code == 404
+
+
 def test_root_serves_viewer_html():
     store = SQLiteStore()
     client = TestClient(create_app(store))

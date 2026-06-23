@@ -4,7 +4,8 @@ const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
 let cy = null;
-let current = null; // currently rendered engagement
+let current = null; // current engagement
+let stepByName = {}; // name -> step (shared by graph + timeline)
 
 async function loadEngagements() {
   const list = await (await fetch("/api/engagements")).json();
@@ -27,13 +28,23 @@ async function loadEngagements() {
 async function selectEngagement(id, li) {
   document.querySelectorAll("#engagement-list li").forEach((n) => n.classList.remove("active"));
   if (li) li.classList.add("active");
-  current = await (await fetch(`/api/engagements/${id}`)).json();
-  renderGraph(current);
+
+  const [eng, timeline] = await Promise.all([
+    fetch(`/api/engagements/${id}`).then((r) => r.json()),
+    fetch(`/api/engagements/${id}/timeline`).then((r) => r.json()),
+  ]);
+  current = eng;
+  stepByName = {};
+  eng.steps.forEach((s) => (stepByName[s.name] = s));
+
+  renderGraph(eng);
+  renderTimeline(timeline);
   $("#detail-title").textContent = "Select a node";
-  $("#detail-body").innerHTML = '<span class="muted">Click a step in the graph.</span>';
+  $("#detail-body").innerHTML = '<span class="muted">Click a step in the graph or timeline.</span>';
 }
 
-// The ordered list of executed step names, and the directed pairs between them.
+// ---- graph ----------------------------------------------------------------
+
 function executedInfo(eng) {
   const names = eng.steps.map((s) => s.name);
   const executed = new Set(names);
@@ -47,8 +58,6 @@ function executedInfo(eng) {
 
 function renderGraph(eng) {
   const { executed, pairs } = executedInfo(eng);
-  const stepByName = {};
-  eng.steps.forEach((s) => (stepByName[s.name] = s));
 
   const elements = [];
   eng.topology.nodes.forEach((n) => {
@@ -56,7 +65,7 @@ function renderGraph(eng) {
     let cls = executed.has(n.name) ? "executed" : "idle";
     if (step && step.status === "failed") cls = "failed";
     if (n.is_global) cls += " global";
-    elements.push({ data: { id: n.name, label: n.name, isGlobal: n.is_global }, classes: cls });
+    elements.push({ data: { id: n.name, label: n.name }, classes: cls });
   });
   eng.topology.edges.forEach((e) => {
     const taken = pairs.has(e.source + "→" + e.target);
@@ -80,6 +89,7 @@ function renderGraph(eng) {
       { selector: "node.failed", style: { "background-color": "#8b1a17", "border-color": "#f85149" } },
       { selector: "node.global", style: { shape: "round-diamond", width: 120, height: 70, "background-color": "#6e40c9", "border-color": "#d2a8ff" } },
       { selector: "node.idle", style: { "background-color": "#1c2430", color: "#7d8794" } },
+      { selector: "node.sel", style: { "border-width": 4, "border-color": "#4f9cff" } },
       { selector: "edge", style: {
           width: 2, "line-color": "#3a434f", "target-arrow-color": "#3a434f",
           "target-arrow-shape": "triangle", "curve-style": "bezier",
@@ -91,7 +101,79 @@ function renderGraph(eng) {
     layout: { name: "breadthfirst", directed: true, spacingFactor: 1.3, padding: 24 },
   });
 
-  cy.on("tap", "node", (evt) => showStep(stepByName[evt.target.id()], evt.target.id()));
+  cy.on("tap", "node", (evt) => selectStep(evt.target.id()));
+}
+
+// ---- timeline -------------------------------------------------------------
+
+function renderTimeline(tv) {
+  const total = tv.total_ms || 1;
+  const el = $("#timeline");
+  el.innerHTML = "";
+  $("#timeline-total").textContent = `${tv.total_ms.toFixed(2)} ms`;
+
+  if (tv.intent_switches.length) {
+    const row = document.createElement("div");
+    row.className = "tl-switch-row";
+    tv.intent_switches.forEach((sw) => {
+      const m = document.createElement("div");
+      m.className = "tl-switch";
+      m.style.left = (sw.offset_ms / total) * 100 + "%";
+      m.title = `${sw.name} @ ${sw.offset_ms.toFixed(2)}ms`;
+      row.appendChild(m);
+    });
+    el.appendChild(row);
+  }
+
+  tv.lanes.forEach((lane) => {
+    const row = document.createElement("div");
+    row.className = "tl-lane";
+    row.dataset.step = lane.name;
+
+    const label = document.createElement("div");
+    label.className = "tl-label";
+    label.textContent = lane.name;
+    label.title = lane.name;
+
+    const track = document.createElement("div");
+    track.className = "tl-track";
+
+    const bar = document.createElement("div");
+    let cls = lane.status === "failed" ? "failed" : "executed";
+    if (lane.is_global) cls = "global";
+    bar.className = "tl-bar " + cls;
+    bar.style.left = (lane.offset_ms / total) * 100 + "%";
+    bar.style.width = Math.max(0.4, (lane.duration_ms / total) * 100) + "%";
+    bar.title = `${lane.name} · ${lane.duration_ms.toFixed(2)}ms`;
+    track.appendChild(bar);
+
+    lane.events.forEach((ev) => {
+      const mk = document.createElement("div");
+      mk.className = "tl-mark " + ev.kind;
+      mk.style.left = (ev.offset_ms / total) * 100 + "%";
+      mk.title = `${ev.kind}: ${ev.name}`;
+      track.appendChild(mk);
+    });
+
+    row.onclick = () => selectStep(lane.name);
+    row.appendChild(label);
+    row.appendChild(track);
+    el.appendChild(row);
+  });
+}
+
+// ---- shared selection (the link between graph and timeline) ---------------
+
+function selectStep(name) {
+  showStep(stepByName[name], name);
+  if (cy) {
+    cy.nodes().removeClass("sel");
+    const node = cy.$id(name);
+    if (node) node.addClass("sel");
+  }
+  document
+    .querySelectorAll(".tl-lane")
+    .forEach((row) => row.classList.toggle("sel", row.dataset.step === name));
 }
 
 function showStep(step, name) {
@@ -102,7 +184,7 @@ function showStep(step, name) {
   }
   const rows = [
     ["status", step.status],
-    ["duration", step.duration_ms != null ? step.duration_ms.toFixed(1) + " ms" : "—"],
+    ["duration", step.duration_ms != null ? step.duration_ms.toFixed(2) + " ms" : "—"],
     ["global", step.is_global ? "yes" : "no"],
     ["tools", step.tools_available.join(", ") || "—"],
   ];
@@ -121,6 +203,8 @@ function showStep(step, name) {
   $("#detail-body").innerHTML = html;
 }
 
+// ---- live stream ----------------------------------------------------------
+
 function connectStream() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/api/stream`);
@@ -133,7 +217,6 @@ function connectStream() {
     li.innerHTML = `<b>${esc(rec.type)}</b> · ${esc(rec.engagement_id)}`;
     log.prepend(li);
     while (log.children.length > 40) log.removeChild(log.lastChild);
-    // If a new engagement appears, refresh the list.
     if (rec.type === "engagement_started") loadEngagements();
   };
 }

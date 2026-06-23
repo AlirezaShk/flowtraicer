@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
 from ..store.sqlite import SQLiteStore
+from ..timeline import build_timeline
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
@@ -34,6 +35,14 @@ def create_app(store) -> FastAPI:
             return store.get_engagement(engagement_id).model_dump(mode="json")
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="unknown engagement") from exc
+
+    @app.get("/api/engagements/{engagement_id}/timeline")
+    def get_timeline(engagement_id: str):
+        try:
+            engagement = store.get_engagement(engagement_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="unknown engagement") from exc
+        return build_timeline(engagement).model_dump(mode="json")
 
     @app.websocket("/api/stream")
     async def stream(ws: WebSocket):
