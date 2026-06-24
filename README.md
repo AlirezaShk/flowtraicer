@@ -1,9 +1,12 @@
 # FlowTraicer
 
-> **Working name** — will be renamed before open-sourcing.
+## From the Human Author
 
-An independent Python library to **map, visualize, monitor, debug, log, and audit** the
-steps of an engagement between a user and an agentic AI system.
+I couldn't find an intuitive package that JUST works when it comes to visualizing, monitoring, auditing, debugging, and orchestrating agentic workflows in a systematic way. So I just decided to build one with Claude. Feel free to use this, and contribute to it if you feel like it!
+
+## Short Introduction
+
+An open source Python library to **map, visualize, monitor, debug, log, and audit** the steps of an engagement between a user and an agentic AI system.
 
 You build your agent as a [LangGraph](https://github.com/langchain-ai/langgraph) graph;
 `FlowTraicer` captures each run as a structured, append-only trace and renders it as a linked
