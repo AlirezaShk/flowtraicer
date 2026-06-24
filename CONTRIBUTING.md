@@ -13,10 +13,10 @@ Requires Python ≥ 3.11.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"                 # core + test/lint deps (includes fakeredis)
+# Instructor extraction and the LiteLLM client ship as core deps — nothing extra needed.
 # optional, depending on what you touch:
-pip install -e ".[extraction]"          # Instructor extraction
-pip install -e ".[litellm]"             # the LiteLLM client helper
 pip install -e ".[postgres]"            # the Postgres store backend
+pip install -e ".[redis]"               # the Redis store backend
 ```
 
 ## Tests

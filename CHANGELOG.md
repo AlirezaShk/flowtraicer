@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-06-24
+
+### Changed
+- `instructor` and `litellm` are now **core dependencies** — `pip install flowtraicer` is
+  batteries-included (schema extraction via `ft.extraction` and `ft.llm.LiteLLMClient` work out of
+  the box). The `extraction` and `litellm` optional extras are removed. The `openai` / `anthropic`
+  / `google` / `providers` extras remain for picking a specific Instructor `from_provider` SDK, and
+  `redis` / `postgres` for the store backends.
+- README install instructions now use `pip install flowtraicer` (with `[redis]` / `[postgres]` /
+  `[openai]` extras), instead of an editable `pip install -e .`.
+
 ## [0.9.0] - 2026-06-24
 
 First public release. FlowTraicer maps, visualizes, monitors, debugs, logs, and audits the

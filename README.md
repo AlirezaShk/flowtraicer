@@ -32,9 +32,20 @@ Engagement  →  Step (one workflow node)  →  Events (llm_call / tool_call / e
 ## Install
 
 ```bash
-pip install -e ".[dev]"            # core + test deps
-pip install -e ".[extraction,openai]"   # + Instructor extraction with the OpenAI SDK
+pip install flowtraicer
 ```
+
+Batteries included: schema extraction (Instructor) and config-driven multi-provider LLM calls
+(LiteLLM) ship by default. Optional extras for store backends and specific provider SDKs:
+
+```bash
+pip install "flowtraicer[redis]"      # Redis Streams store backend
+pip install "flowtraicer[postgres]"   # Postgres store backend
+pip install "flowtraicer[openai]"     # an explicit provider SDK for Instructor.from_provider
+```
+
+(Requires Python ≥ 3.11. The package imports as `ft`.) Developing FlowTraicer itself? Clone the
+repo and `pip install -e ".[dev]"`.
 
 ## Getting started: instrument a LangGraph agent
 
@@ -145,7 +156,7 @@ When a node calls `await ctx.llm(prompt)`, the workflow calls `acomplete` on wha
 or SDK — there's no LiteLLM requirement.
 
 **The bundled option** is `LiteLLMClient`, which wraps [LiteLLM](https://docs.litellm.ai) so one
-config targets 100+ providers (install the `litellm` extra):
+config targets 100+ providers (LiteLLM ships with FlowTraicer):
 
 ```python
 from ft.llm import LiteLLMClient
@@ -300,10 +311,10 @@ work identically on all three:
 from ft.store.sqlite import SQLiteStore      # default; zero deps, file or :memory:
 store = SQLiteStore("traces.db")
 
-from ft.store.redis import RedisStore         # pip install -e ".[redis]"
+from ft.store.redis import RedisStore         # pip install "flowtraicer[redis]"
 store = RedisStore("redis://localhost:6379")   # Redis Streams; live tail across processes
 
-from ft.store.postgres import PostgresStore   # pip install -e ".[postgres]"
+from ft.store.postgres import PostgresStore   # pip install "flowtraicer[postgres]"
 store = PostgresStore("postgresql://localhost/FlowTraicer")  # durable JSONB + LISTEN/NOTIFY
 ```
 

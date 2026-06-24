@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flowtraicer"
-version = "0.9.0"
+version = "0.9.1"
 description = "Map, visualize, monitor, debug, log and audit the steps of an engagement between a user and an agentic AI system."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -29,6 +29,8 @@ dependencies = [
     "langchain-core>=0.3",
     "fastapi>=0.110",
     "uvicorn>=0.29",
+    "instructor>=1.0",
+    "litellm>=1.40",
 ]
 
 [project.urls]
@@ -38,11 +40,9 @@ Issues = "https://github.com/AlirezaShk/flowtraicer/issues"
 Changelog = "https://github.com/AlirezaShk/flowtraicer/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-# Schema extraction. Instructor's `from_provider` is the multi-provider abstraction;
-# install the SDK for the provider you target (extras below, or all via `providers`).
-extraction = ["instructor>=1.0"]
-# Config-driven multi-provider LLM calls (ft.llm.LiteLLMClient).
-litellm = ["litellm>=1.40"]
+# Instructor's `from_provider` (used by ft.extraction) can target a specific provider SDK;
+# install the one you want (or all via `providers`). LiteLLM (a core dep) already covers most
+# providers without these.
 openai = ["openai>=1.0"]
 anthropic = ["anthropic>=0.40"]
 google = ["google-genai>=1.0"]

@@ -33,7 +33,7 @@ jobs:
           cache: pip
 
       - name: Install (with test extras)
-        run: pip install -e ".[dev,extraction,litellm]"
+        run: pip install -e ".[dev]"
 
       - name: Sanity — lint, import, test
         run: |
