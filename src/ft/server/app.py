@@ -79,17 +79,33 @@ def build_default_app() -> tuple[FastAPI, SQLiteStore]:
     return create_app(store), store
 
 
+def serve(store, *, host: str = "127.0.0.1", port: int = 8400) -> None:
+    """Run the viewer for ``store`` — the one-liner way to look at your traces.
+
+    FlowTraicer owns the uvicorn server, so you don't build an app or wire uvicorn yourself::
+
+        from ft.server.app import serve          # (also: from ft.server import serve)
+        from ft.store.postgres import PostgresStore
+
+        serve(PostgresStore(DSN), host="0.0.0.0", port=8400)
+
+    Blocks until the server stops. Bind to ``0.0.0.0`` only behind your own auth/network controls —
+    traces can contain user data.
+    """
+    import uvicorn
+
+    print(f"FlowTraicer viewer -> http://{host}:{port}")
+    uvicorn.run(create_app(store), host=host, port=port)
+
+
 def main() -> None:  # pragma: no cover - thin CLI entry point
     """Serve the demo-seeded viewer (the ``ft-server`` console script)."""
     import os
 
-    import uvicorn
-
-    host = os.environ.get("XAI_HOST", "127.0.0.1")
-    port = int(os.environ.get("XAI_PORT", "8400"))  # 8000 is commonly taken (Docker/backend)
-    app, _ = build_default_app()
-    print(f"FlowTraicer viewer -> http://{host}:{port}")
-    uvicorn.run(app, host=host, port=port)
+    host = os.environ.get("FT_HOST", os.environ.get("XAI_HOST", "127.0.0.1"))
+    port = int(os.environ.get("FT_PORT", os.environ.get("XAI_PORT", "8400")))
+    _, store = build_default_app()
+    serve(store, host=host, port=port)
 
 
 if __name__ == "__main__":  # pragma: no cover

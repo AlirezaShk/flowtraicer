@@ -89,3 +89,27 @@ def test_root_serves_viewer_html():
     resp = client.get("/")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
+
+
+def test_serve_creates_app_from_store_and_runs_uvicorn(monkeypatch):
+    """serve(store, host, port) builds the viewer app and runs uvicorn — no boilerplate."""
+    import uvicorn
+    from fastapi import FastAPI
+
+    from ft.server.app import serve
+
+    captured = {}
+
+    def fake_run(app, *, host, port, **kwargs):
+        captured.update(app=app, host=host, port=port)
+
+    monkeypatch.setattr(uvicorn, "run", fake_run)
+
+    store = SQLiteStore()
+    _seed(store)
+    serve(store, host="0.0.0.0", port=9999)
+
+    assert isinstance(captured["app"], FastAPI)
+    assert (captured["host"], captured["port"]) == ("0.0.0.0", 9999)
+    # the served app is wired to the given store
+    assert TestClient(captured["app"]).get("/api/engagements").status_code == 200

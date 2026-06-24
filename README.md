@@ -373,14 +373,17 @@ linked). To explore the bundled demo:
 python -m ft.server.app        # http://127.0.0.1:8400
 ```
 
-To view **your own** store, build the app around it:
+To view **your own** store, just hand it to `serve` — FlowTraicer runs the server for you:
 
 ```python
-import uvicorn
-from ft.server.app import create_app
+from ft.server import serve
+from ft.store.sqlite import SQLiteStore   # or PostgresStore / RedisStore
 
-uvicorn.run(create_app(SQLiteStore("traces.db")), host="127.0.0.1", port=8400)
+serve(SQLiteStore("traces.db"), host="127.0.0.1", port=8400)
 ```
+
+(Need the app object instead — e.g. to mount behind your own ASGI server or add auth?
+`from ft.server import create_app; app = create_app(store)`.)
 
 The API behind the viewer:
 

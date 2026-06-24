@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `ft.server.serve(store, host=…, port=…)` — run the trace viewer in one line; FlowTraicer owns
+  the uvicorn server, so you no longer build the app and call `uvicorn.run` yourself. `create_app`
+  is still exported for when you want the ASGI app (custom server / auth).
+
 ## [0.9.1] - 2026-06-24
 
 ### Changed
