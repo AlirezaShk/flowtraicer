@@ -6,34 +6,59 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-06-24
+
+First public release. FlowTraicer maps, visualizes, monitors, debugs, logs, and audits the
+steps of an engagement between a user and an agentic AI system.
+
 ### Added
-- Trace core: `Engagement → Step → Event` model with per-step tools, per-step extraction,
-  global-step intent switches, and per-step/engagement token totals.
-- Pluggable append-only `Store`: SQLite (default), Redis Streams, and Postgres
-  (JSONB + `LISTEN/NOTIFY`) backends; live `subscribe` on all three.
-- LangGraph auto-instrumentation (`run_instrumented`, `read_topology`) and a `TraceState`
-  base graph-state.
-- `Workflow` orchestration DSL with an injected per-step LLM context (`ctx.llm`) that records
-  token usage automatically.
-- **Reusable workflows (build once, run many):** a `Workflow` compiles its graph once (cached);
-  per-run dependencies pass through `run(..., llm=…, deps=…)` and surface to nodes via `ctx.llm`
-  / `ctx.deps` (LangGraph `configurable` DI). Nodes no longer close over request state, so a
-  single workflow instance serves every request without rebuilding/recompiling the graph.
-- Instructor-powered per-step schema extraction and a provider-agnostic LLM integration: the
-  `ft.llm.LLMClient` protocol (one `acomplete` method) is the only contract `ctx.llm` requires, so
-  any provider/SDK can be plugged in; `LiteLLMClient` is the bundled config-driven implementation
-  (one config → 100+ providers). See the README's "bring your own provider" section.
+
+**Trace core**
+- `Engagement → Step → Event` model with per-step tools, per-step extraction, global-step
+  intent switches, and per-step / per-engagement token totals.
+- `TraceState` base graph-state declaring the conventional channels (`tool_calls`, `llm_calls`,
+  `events`, `extraction`) so nodes never redeclare them.
+
+**Storage**
+- Pluggable append-only `Store` with SQLite (default, zero-dependency), Redis Streams, and
+  Postgres (JSONB + `LISTEN/NOTIFY`) backends, plus live `subscribe` on all three.
+
+**LangGraph integration**
+- Auto-instrumentation: `run_instrumented` records node entry/exit, timing, tools, LLM calls,
+  extractions, and intent switches; `read_topology` reflects the compiled graph.
+- Drop-off tracking: `goal_nodes` mark journeys that never reached a goal as `ABANDONED` with
+  `dropped_at` set to the last step reached.
+
+**Workflow orchestration**
+- `Workflow` DSL over LangGraph (declare steps, tools, global steps, goals, edges) with an
+  injected per-step context (`ctx.llm`) that records token usage automatically.
+- **Build once, run many:** a `Workflow` compiles its graph once (cached); per-run dependencies
+  pass through `run(..., llm=…, deps=…)` and surface to nodes via `ctx.llm` / `ctx.deps`
+  (LangGraph `configurable` DI). Nodes no longer close over request state, so one workflow
+  instance serves every request without rebuilding/recompiling the graph.
+
+**LLM integration (provider-agnostic)**
+- `ft.llm.LLMClient` protocol (one async `acomplete` method) is the only contract `ctx.llm`
+  requires, so any provider/SDK can be plugged in. `LiteLLMClient` is the bundled, config-driven
+  implementation (one config → 100+ providers). See the README's "bring your own provider".
+- Instructor-powered per-step schema extraction (`ft.extraction`).
 - Global LLM-provider registry: `ft.registry.REGISTER.set_llm_provider(client)` sets one default
   provider every workflow falls back to (resolution order: per-run `llm=` > `Workflow(llm=)` >
-  registry). It **validates** the client satisfies `LLMClient` (callable, async `acomplete`) and
-  raises a descriptive `TypeError` otherwise.
+  registry). Validates the client satisfies `LLMClient` and raises a descriptive `TypeError`
+  otherwise.
 - Global recorder for out-of-workflow LLM calls: `REGISTER.set_recorder(recorder)` +
   `REGISTER.record_llm_usage(model, tokens=…, caller=…, metadata=…)` record token usage from
-  agent/LLM calls that don't run inside a `Workflow` (chat, voice, extraction). Each call becomes a
-  small self-contained engagement (one `llm_call` event) so it rolls up in the viewer/analytics by
-  model/caller. Fail-open (no recorder set → no-op); the recorder is validated on registration.
-- Cross-engagement analytics (`funnel`, `journeys`, `group_by`), retention (`purge`,
-  `RetentionPolicy`), and tamper-evident audit digests (`ft.audit`).
+  agent/LLM calls made outside a `Workflow` (chat, voice, extraction). Each becomes a small
+  self-contained engagement so it rolls up by model/caller. Fail-open; validated on registration.
+
+**Analytics, retention & audit**
+- Cross-engagement analytics: `funnel`, `journeys`, `group_by`.
+- Retention: `purge` / `RetentionPolicy` (completed engagements past their window; active ones
+  never purged).
+- Tamper-evident audit digests (`ft.audit`): fingerprint an engagement and later detect any
+  alteration.
+
+**Viewer**
 - FastAPI query + live-stream server and a linked Cytoscape.js **graph + timeline** viewer.
 
-> Pre-1.0 and under active development; the public name is provisional.
+> Pre-1.0: the public API may still change between minor versions.
