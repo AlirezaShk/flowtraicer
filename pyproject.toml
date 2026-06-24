@@ -11,7 +11,18 @@ requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [{ name = "TeranoAI" }]
 keywords = ["agents", "observability", "langgraph", "tracing", "llm", "audit"]
-
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: System :: Monitoring",
+    "Typing :: Typed",
+]
 dependencies = [
     "pydantic>=2.7",
     "langgraph>=0.2",
@@ -19,6 +30,13 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
 ]
+
+# Working name — update owner/repo when the project is published under its final name.
+[project.urls]
+Homepage = "https://github.com/OWNER/xai"
+Repository = "https://github.com/OWNER/xai"
+Issues = "https://github.com/OWNER/xai/issues"
+Changelog = "https://github.com/OWNER/xai/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Schema extraction. Instructor's `from_provider` is the multi-provider abstraction;
