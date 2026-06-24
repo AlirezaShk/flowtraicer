@@ -23,7 +23,7 @@ _STATIC_DIR = Path(__file__).parent / "static"
 
 def create_app(store) -> FastAPI:
     """Build a viewer app backed by ``store``."""
-    app = FastAPI(title="xai viewer", version="0.0.1")
+    app = FastAPI(title="FlowTraicer viewer", version="0.0.1")
 
     @app.get("/api/engagements")
     def list_engagements():
@@ -62,7 +62,7 @@ def create_app(store) -> FastAPI:
 
 
 def build_default_app() -> tuple[FastAPI, SQLiteStore]:
-    """An in-memory store seeded with both demo runs, plus its app (for ``xai-server``)."""
+    """An in-memory store seeded with both demo runs, plus its app (for ``ft-server``)."""
     import asyncio
 
     from ..examples.demo_agent import run_demo
@@ -80,7 +80,7 @@ def build_default_app() -> tuple[FastAPI, SQLiteStore]:
 
 
 def main() -> None:  # pragma: no cover - thin CLI entry point
-    """Serve the demo-seeded viewer (the ``xai-server`` console script)."""
+    """Serve the demo-seeded viewer (the ``ft-server`` console script)."""
     import os
 
     import uvicorn
@@ -88,7 +88,7 @@ def main() -> None:  # pragma: no cover - thin CLI entry point
     host = os.environ.get("XAI_HOST", "127.0.0.1")
     port = int(os.environ.get("XAI_PORT", "8400"))  # 8000 is commonly taken (Docker/backend)
     app, _ = build_default_app()
-    print(f"xai viewer -> http://{host}:{port}")
+    print(f"FlowTraicer viewer -> http://{host}:{port}")
     uvicorn.run(app, host=host, port=port)
 
 

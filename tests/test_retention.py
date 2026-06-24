@@ -6,11 +6,11 @@ import fakeredis
 import fakeredis.aioredis
 import pytest
 
-from xai.core.model import EngagementStatus
-from xai.retention import RetentionPolicy, purge_before
-from xai.store.records import EngagementEnded, EngagementStarted
-from xai.store.redis import RedisStore
-from xai.store.sqlite import SQLiteStore
+from ft.core.model import EngagementStatus
+from ft.retention import RetentionPolicy, purge_before
+from ft.store.records import EngagementEnded, EngagementStarted
+from ft.store.redis import RedisStore
+from ft.store.sqlite import SQLiteStore
 
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
 

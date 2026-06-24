@@ -1,10 +1,10 @@
-# Contributing to xai
+# Contributing to FlowTraicer
 
-Thanks for your interest! `xai` is a small, focused library — contributions that keep it
+Thanks for your interest! `FlowTraicer` is a small, focused library — contributions that keep it
 that way (clear boundaries, tested, documented) are very welcome.
 
-> **Note:** `xai` is a working name and will be renamed before the first public release. The
-> package imports as `xai` today; if you reference it, expect a rename.
+> **Note:** `FlowTraicer` is a working name and will be renamed before the first public release. The
+> package imports as `FlowTraicer` today; if you reference it, expect a rename.
 
 ## Development setup
 
@@ -26,12 +26,12 @@ pytest                                   # the full suite
 ```
 
 - The **SQLite** and **Redis** store tests run offline (Redis via `fakeredis`).
-- The **Postgres** store tests are skipped unless `XAI_TEST_PG_DSN` is set:
+- The **Postgres** store tests are skipped unless `FT_TEST_PG_DSN` is set:
 
   ```bash
-  docker run -d --name xai-pg -e POSTGRES_PASSWORD=xai -e POSTGRES_DB=xai \
+  docker run -d --name FlowTraicer-pg -e POSTGRES_PASSWORD=FlowTraicer -e POSTGRES_DB=FlowTraicer \
     -p 5432:5432 postgres:16-alpine
-  XAI_TEST_PG_DSN="postgresql://postgres:xai@127.0.0.1:5432/xai" pytest
+  FT_TEST_PG_DSN="postgresql://postgres:FlowTraicer@127.0.0.1:5432/FlowTraicer" pytest
   ```
 
 - No test needs a network or an API key — LLM/provider calls are injected/stubbed.
@@ -51,7 +51,7 @@ push and PR. Keep the build green.
 
 ## Design principles
 
-- **The trace core is framework-agnostic.** Only `xai.langgraph_adapter` knows about
+- **The trace core is framework-agnostic.** Only `ft.langgraph_adapter` knows about
   LangGraph; other engines should be added as adapters that call the recorder's emit API.
 - **Instrumentation is fail-open** — recording must never crash the observed agent.
 - **Small, well-bounded units** with clear interfaces. If a file is doing too much, split it.

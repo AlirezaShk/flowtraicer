@@ -1,4 +1,4 @@
-# xai
+# FlowTraicer
 
 > **Working name** — will be renamed before open-sourcing.
 
@@ -6,7 +6,7 @@ An independent Python library to **map, visualize, monitor, debug, log, and audi
 steps of an engagement between a user and an agentic AI system.
 
 You build your agent as a [LangGraph](https://github.com/langchain-ai/langgraph) graph;
-`xai` captures each run as a structured, append-only trace and renders it as a linked
+`FlowTraicer` captures each run as a structured, append-only trace and renders it as a linked
 **graph + timeline** in a browser.
 
 ## The model
@@ -33,7 +33,7 @@ pip install -e ".[dev]"            # core + test deps
 pip install -e ".[extraction,openai]"   # + Instructor extraction with the OpenAI SDK
 ```
 
-(Requires Python ≥ 3.11. The package imports as `xai` regardless of the `src/` layout.)
+(Requires Python ≥ 3.11. The package imports as `FlowTraicer` regardless of the `src/` layout.)
 
 ## Getting started: instrument a LangGraph agent
 
@@ -44,14 +44,14 @@ from operator import add
 
 from langgraph.graph import StateGraph, START, END
 
-from xai.store.sqlite import SQLiteStore
-from xai.recorder import Recorder
-from xai.langgraph_adapter import run_instrumented
+from ft.store.sqlite import SQLiteStore
+from ft.recorder import Recorder
+from ft.langgraph_adapter import run_instrumented
 
 
 # 1. Build your agent as a normal LangGraph graph. Extend TraceState so you don't
-#    redeclare xai's channels (tool_calls / llm_calls / events / extraction) yourself.
-from xai.langgraph_adapter import TraceState
+#    redeclare FlowTraicer's channels (tool_calls / llm_calls / events / extraction) yourself.
+from ft.langgraph_adapter import TraceState
 
 class State(TraceState):
     messages: Annotated[list, add]     # your own domain fields
@@ -128,12 +128,12 @@ await run_instrumented(app, state, recorder,
 
 ### Free-form LLM calls, any provider (LiteLLM)
 
-xai's core only *records* tokens. For the calls themselves, the optional `xai.llm` helper
+FlowTraicer's core only *records* tokens. For the calls themselves, the optional `ft.llm` helper
 wraps [LiteLLM](https://docs.litellm.ai) so one config targets any provider — and returns
 token usage that drops into `llm_calls`:
 
 ```python
-from xai.llm import LiteLLMClient
+from ft.llm import LiteLLMClient
 
 llm = LiteLLMClient(provider="openai", model="gpt-5-nano", api_key="XXX")
 # or from a config blob: LiteLLMClient.from_config({"llm_provider": "openai", "model": "...", "key": "..."})
@@ -148,7 +148,7 @@ Install with the `litellm` extra. (Structured extraction uses Instructor; see be
 
 ```python
 from pydantic import BaseModel
-from xai.extraction import Extractor
+from ft.extraction import Extractor
 
 class BudgetInfo(BaseModel):
     budget: int
@@ -165,12 +165,12 @@ extractor.extract_and_record(recorder, step_id, BudgetInfo, "Shibuya, around ¥9
 
 ## Declarative workflows (the DSL)
 
-`xai.orchestration.Workflow` is sugar over LangGraph: declare steps (with tools), global
+`ft.orchestration.Workflow` is sugar over LangGraph: declare steps (with tools), global
 steps, goals, and edges once — it compiles the graph and wires per-step tools / global nodes
 / goal nodes into the recorder, so there's no separate bookkeeping to pass to the runner.
 
 ```python
-from xai.orchestration import Workflow
+from ft.orchestration import Workflow
 
 wf = Workflow("school_journey", state_schema=State, goal_nodes={"submit"})
 
@@ -197,14 +197,14 @@ summaries, subscribe to a live tail). Pick by environment — the trace, viewer,
 work identically on all three:
 
 ```python
-from xai.store.sqlite import SQLiteStore      # default; zero deps, file or :memory:
+from ft.store.sqlite import SQLiteStore      # default; zero deps, file or :memory:
 store = SQLiteStore("traces.db")
 
-from xai.store.redis import RedisStore         # pip install -e ".[redis]"
+from ft.store.redis import RedisStore         # pip install -e ".[redis]"
 store = RedisStore("redis://localhost:6379")   # Redis Streams; live tail across processes
 
-from xai.store.postgres import PostgresStore   # pip install -e ".[postgres]"
-store = PostgresStore("postgresql://localhost/xai")  # durable JSONB + LISTEN/NOTIFY
+from ft.store.postgres import PostgresStore   # pip install -e ".[postgres]"
+store = PostgresStore("postgresql://localhost/FlowTraicer")  # durable JSONB + LISTEN/NOTIFY
 ```
 
 - **SQLite** — local dev, single process, audit-friendly append-only file.
@@ -215,8 +215,8 @@ store = PostgresStore("postgresql://localhost/xai")  # durable JSONB + LISTEN/NO
 
 ```python
 from datetime import timedelta
-from xai.retention import RetentionPolicy, purge_before
-from xai.audit import engagement_digest, verify
+from ft.retention import RetentionPolicy, purge_before
+from ft.audit import engagement_digest, verify
 
 # retention — drop whole completed engagements past their window (active ones never purged)
 purged_ids = RetentionPolicy(max_age=timedelta(days=90)).apply(store, now=...)
@@ -228,7 +228,7 @@ verify(store.get_engagement(eid), digest)               # -> False if the trail 
 ```
 
 Anchor the digest outside the trace store (WORM / transparency log / signature) for strong
-tamper-evidence — see `xai/audit.py` for the threat model.
+tamper-evidence — see `FlowTraicer/audit.py` for the threat model.
 
 ## Analytics: funnels & journeys
 
@@ -236,7 +236,7 @@ Across many engagements (tag each with `user_id`/`session_id` in `metadata`), an
 *"where do users drop off, and what did each step cost?"*:
 
 ```python
-from xai.analytics import funnel, journeys, group_by
+from ft.analytics import funnel, journeys, group_by
 
 f = funnel(store, ["intake", "school_selection", "comparison", "application", "submitted"])
 for step in f.steps:
@@ -259,14 +259,14 @@ The viewer is a FastAPI app + a Cytoscape.js single page (graph on top, timeline
 linked). To explore the bundled demo:
 
 ```bash
-python -m xai.server.app        # http://127.0.0.1:8400
+python -m ft.server.app        # http://127.0.0.1:8400
 ```
 
 To view **your own** store, build the app around it:
 
 ```python
 import uvicorn
-from xai.server.app import create_app
+from ft.server.app import create_app
 
 uvicorn.run(create_app(SQLiteStore("traces.db")), host="127.0.0.1", port=8400)
 ```
@@ -284,17 +284,17 @@ The API behind the viewer:
 
 | Module | Responsibility |
 |---|---|
-| `xai.core.model` | the Pydantic data model (framework-agnostic) |
-| `xai.store` | append-only `Store` protocol + SQLite default backend |
-| `xai.recorder` | the fail-open emit contract |
-| `xai.langgraph_adapter` | `run_instrumented` + `read_topology` |
-| `xai.orchestration` | `Workflow` DSL — declare steps/global-steps/tools/goals over LangGraph |
-| `xai.extraction` | Instructor-powered per-step schema extraction |
-| `xai.llm` | config-driven multi-provider LLM calls (LiteLLM) |
-| `xai.analytics` | cross-engagement funnels, drop-off, journey grouping |
-| `xai.retention` / `xai.audit` | purge old engagements; tamper-evident digests |
-| `xai.timeline` | temporal viewmodel for the timeline view |
-| `xai.server` | FastAPI query + live-stream API and the viewer |
+| `ft.core.model` | the Pydantic data model (framework-agnostic) |
+| `ft.store` | append-only `Store` protocol + SQLite default backend |
+| `ft.recorder` | the fail-open emit contract |
+| `ft.langgraph_adapter` | `run_instrumented` + `read_topology` |
+| `ft.orchestration` | `Workflow` DSL — declare steps/global-steps/tools/goals over LangGraph |
+| `ft.extraction` | Instructor-powered per-step schema extraction |
+| `ft.llm` | config-driven multi-provider LLM calls (LiteLLM) |
+| `ft.analytics` | cross-engagement funnels, drop-off, journey grouping |
+| `ft.retention` / `ft.audit` | purge old engagements; tamper-evident digests |
+| `ft.timeline` | temporal viewmodel for the timeline view |
+| `ft.server` | FastAPI query + live-stream API and the viewer |
 
 The trace **core knows nothing about LangGraph** — the adapter feeds it through the
 recorder's small emit API, so other engines can be added as adapters later.

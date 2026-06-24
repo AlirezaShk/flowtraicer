@@ -2,9 +2,9 @@
 
 from pydantic import BaseModel
 
-from xai.extraction import ExtractionResult, Extractor
-from xai.recorder import Recorder
-from xai.store.sqlite import SQLiteStore
+from ft.extraction import ExtractionResult, Extractor
+from ft.recorder import Recorder
+from ft.store.sqlite import SQLiteStore
 
 
 class BudgetInfo(BaseModel):

@@ -1,6 +1,6 @@
 """Tests for the core data model: Engagement -> Step -> Events."""
 
-from xai.core.model import (
+from ft.core.model import (
     EdgeDef,
     Engagement,
     EngagementStatus,

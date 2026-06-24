@@ -2,8 +2,8 @@
 
 from datetime import UTC, datetime, timedelta
 
-from xai.core.model import Engagement, EventKind, Step, StepEvent, TokenUsage
-from xai.timeline import build_timeline
+from ft.core.model import Engagement, EventKind, Step, StepEvent, TokenUsage
+from ft.timeline import build_timeline
 
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
 

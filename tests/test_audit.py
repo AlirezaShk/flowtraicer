@@ -2,8 +2,8 @@
 
 from datetime import UTC, datetime
 
-from xai.audit import engagement_digest, verify
-from xai.core.model import Engagement, Step
+from ft.audit import engagement_digest, verify
+from ft.core.model import Engagement, Step
 
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
 

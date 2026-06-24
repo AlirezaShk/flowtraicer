@@ -1,6 +1,6 @@
-# xai — Walking-Skeleton Design
+# FlowTraicer — Walking-Skeleton Design
 
-> Working name **`xai`** (will be renamed before open-sourcing). An independent Python
+> Working name **`FlowTraicer`** (will be renamed before open-sourcing). An independent Python
 > library for mapping, visualizing, monitoring, debugging, logging, and auditing the
 > steps of an engagement between a user and an agentic AI system.
 
@@ -165,7 +165,7 @@ its body in try/except, logs on failure, and never raises into the caller —
 
 ## 10. Note on repo nesting
 
-The library is initialized as its **own git repo** at `backend/src/lib/xai/`, nested inside
+The library is initialized as its **own git repo** at `backend/src/lib/FlowTraicer/`, nested inside
 the backend submodule's working tree. This is intentional for later extraction to a
-standalone open-source repo. The backend repo will see `xai/` as an embedded repository;
+standalone open-source repo. The backend repo will see `FlowTraicer/` as an embedded repository;
 add it to the backend's ignore rules if that becomes noisy.

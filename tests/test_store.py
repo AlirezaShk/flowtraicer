@@ -2,7 +2,7 @@
 
 import pytest
 
-from xai.core.model import (
+from ft.core.model import (
     EngagementStatus,
     EventKind,
     Extraction,
@@ -12,8 +12,8 @@ from xai.core.model import (
     StepStatus,
     Topology,
 )
-from xai.store.reconstruct import fold
-from xai.store.records import (
+from ft.store.reconstruct import fold
+from ft.store.records import (
     EngagementEnded,
     EngagementStarted,
     EventRecorded,
@@ -22,7 +22,7 @@ from xai.store.records import (
     StepEnded,
     StepStarted,
 )
-from xai.store.sqlite import SQLiteStore
+from ft.store.sqlite import SQLiteStore
 
 
 def _full_record_stream(engagement_id="e1", step_id="s1"):

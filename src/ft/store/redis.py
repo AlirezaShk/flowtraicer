@@ -39,7 +39,7 @@ class RedisStore:
         *,
         client=None,
         async_client=None,
-        key_prefix: str = "xai",
+        key_prefix: str = "ft",
     ) -> None:
         self._url = url
         self._client = client

@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from xai.core.model import (
+from ft.core.model import (
     Engagement,
     EventKind,
     IntentSwitch,
@@ -10,7 +10,7 @@ from xai.core.model import (
     StepEvent,
     StepStatus,
 )
-from xai.timeline import TimelineView, build_timeline
+from ft.timeline import TimelineView, build_timeline
 
 T0 = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
 

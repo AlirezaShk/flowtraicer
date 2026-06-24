@@ -2,10 +2,10 @@
 
 from fastapi.testclient import TestClient
 
-from xai.core.model import EngagementStatus, NodeDef, Topology
-from xai.server.app import create_app
-from xai.store.records import EngagementEnded, EngagementStarted, StepStarted
-from xai.store.sqlite import SQLiteStore
+from ft.core.model import EngagementStatus, NodeDef, Topology
+from ft.server.app import create_app
+from ft.store.records import EngagementEnded, EngagementStarted, StepStarted
+from ft.store.sqlite import SQLiteStore
 
 
 def _seed(store, engagement_id="e1"):

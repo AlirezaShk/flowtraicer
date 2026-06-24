@@ -1,4 +1,4 @@
-"""Tests for the Postgres store backend (requires a real Postgres; set XAI_TEST_PG_DSN)."""
+"""Tests for the Postgres store backend (requires a real Postgres; set FT_TEST_PG_DSN)."""
 
 import asyncio
 import os
@@ -6,14 +6,14 @@ from uuid import uuid4
 
 import pytest
 
-from xai.core.model import (
+from ft.core.model import (
     EngagementStatus,
     EventKind,
     Extraction,
     StepEvent,
     StepStatus,
 )
-from xai.store.records import (
+from ft.store.records import (
     EngagementEnded,
     EngagementStarted,
     EventRecorded,
@@ -22,11 +22,11 @@ from xai.store.records import (
     StepStarted,
 )
 
-PG_DSN = os.environ.get("XAI_TEST_PG_DSN")
-pytestmark = pytest.mark.skipif(not PG_DSN, reason="set XAI_TEST_PG_DSN to run postgres tests")
+PG_DSN = os.environ.get("FT_TEST_PG_DSN")
+pytestmark = pytest.mark.skipif(not PG_DSN, reason="set FT_TEST_PG_DSN to run postgres tests")
 
 if PG_DSN:
-    from xai.store.postgres import PostgresStore
+    from ft.store.postgres import PostgresStore
 
 
 def _pg_store():

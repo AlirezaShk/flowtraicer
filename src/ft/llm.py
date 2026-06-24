@@ -1,11 +1,11 @@
 """Config-driven, multi-provider LLM calls via LiteLLM — with token usage for the trace.
 
-xai's core is provider-agnostic: you give it token counts, it records them. This optional
+FlowTraicer's core is provider-agnostic: you give it token counts, it records them. This optional
 helper closes the loop for free-form LLM turns using `LiteLLM <https://docs.litellm.ai>`_,
 which speaks one OpenAI-style interface to 100+ providers. You configure a provider, model,
 and key once::
 
-    from xai.llm import LiteLLMClient
+    from ft.llm import LiteLLMClient
 
     llm = LiteLLMClient(provider="openai", model="gpt-5-nano", api_key="XXX")
     # or, matching a config blob:
@@ -13,7 +13,7 @@ and key once::
 
     result = llm.complete("Summarize this for the applicant.")
     result.text          # the completion text
-    result.tokens.total  # token usage as an xai TokenUsage
+    result.tokens.total  # token usage as an FlowTraicer TokenUsage
 
 and it drops straight into the LangGraph runner's ``llm_calls`` convention::
 

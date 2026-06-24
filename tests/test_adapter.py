@@ -5,10 +5,10 @@ from typing import Annotated, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from xai.core.model import EventKind, StepStatus
-from xai.langgraph_adapter import read_topology, run_instrumented
-from xai.recorder import Recorder
-from xai.store.sqlite import SQLiteStore
+from ft.core.model import EventKind, StepStatus
+from ft.langgraph_adapter import read_topology, run_instrumented
+from ft.recorder import Recorder
+from ft.store.sqlite import SQLiteStore
 
 
 class _State(TypedDict):

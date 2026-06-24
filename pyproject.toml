@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "xai"
+name = "flowtraicer"
 version = "0.0.1"
 description = "Map, visualize, monitor, debug, log and audit the steps of an engagement between a user and an agentic AI system."
 readme = "README.md"
@@ -33,16 +33,16 @@ dependencies = [
 
 # Working name — update owner/repo when the project is published under its final name.
 [project.urls]
-Homepage = "https://github.com/OWNER/xai"
-Repository = "https://github.com/OWNER/xai"
-Issues = "https://github.com/OWNER/xai/issues"
-Changelog = "https://github.com/OWNER/xai/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/OWNER/flowtraicer"
+Repository = "https://github.com/OWNER/flowtraicer"
+Issues = "https://github.com/OWNER/flowtraicer/issues"
+Changelog = "https://github.com/OWNER/flowtraicer/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Schema extraction. Instructor's `from_provider` is the multi-provider abstraction;
 # install the SDK for the provider you target (extras below, or all via `providers`).
 extraction = ["instructor>=1.0"]
-# Config-driven multi-provider LLM calls (xai.llm.LiteLLMClient).
+# Config-driven multi-provider LLM calls (ft.llm.LiteLLMClient).
 litellm = ["litellm>=1.40"]
 openai = ["openai>=1.0"]
 anthropic = ["anthropic>=0.40"]
@@ -60,10 +60,10 @@ dev = [
 ]
 
 [project.scripts]
-xai-server = "xai.server.app:main"
+ft-server = "ft.server.app:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/xai"]
+packages = ["src/ft"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

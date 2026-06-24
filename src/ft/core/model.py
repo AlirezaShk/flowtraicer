@@ -1,4 +1,4 @@
-"""The xai trace data model.
+"""The FlowTraicer trace data model.
 
 A user<->agent engagement is modelled as a three-level tree::
 

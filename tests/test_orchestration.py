@@ -6,12 +6,12 @@ from typing import Annotated, TypedDict
 
 import pytest
 
-from xai.core.model import EngagementStatus, EventKind
-from xai.langgraph_adapter import TraceState, read_topology
-from xai.llm import LiteLLMClient
-from xai.orchestration import Workflow
-from xai.recorder import Recorder
-from xai.store.sqlite import SQLiteStore
+from ft.core.model import EngagementStatus, EventKind
+from ft.langgraph_adapter import TraceState, read_topology
+from ft.llm import LiteLLMClient
+from ft.orchestration import Workflow
+from ft.recorder import Recorder
+from ft.store.sqlite import SQLiteStore
 
 
 class _State(TypedDict):

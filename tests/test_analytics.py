@@ -1,9 +1,9 @@
 """Tests for cross-engagement analytics: summaries, filtering, and the funnel."""
 
-from xai.analytics import funnel, group_by, journeys
-from xai.core.model import EngagementStatus, StepStatus
-from xai.recorder import Recorder
-from xai.store.sqlite import SQLiteStore
+from ft.analytics import funnel, group_by, journeys
+from ft.core.model import EngagementStatus, StepStatus
+from ft.recorder import Recorder
+from ft.store.sqlite import SQLiteStore
 
 ORDER = ["intake", "selection", "comparison", "application", "submitted"]
 

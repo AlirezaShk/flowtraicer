@@ -1,9 +1,9 @@
-"""End-to-end integration test: the shipped demo agent, captured by xai."""
+"""End-to-end integration test: the shipped demo agent, captured by ft."""
 
-from xai.core.model import EngagementStatus, EventKind, StepStatus
-from xai.examples.demo_agent import GLOBAL_NODES, run_demo
-from xai.recorder import Recorder
-from xai.store.sqlite import SQLiteStore
+from ft.core.model import EngagementStatus, EventKind, StepStatus
+from ft.examples.demo_agent import GLOBAL_NODES, run_demo
+from ft.recorder import Recorder
+from ft.store.sqlite import SQLiteStore
 
 
 async def test_demo_happy_path_is_fully_captured():

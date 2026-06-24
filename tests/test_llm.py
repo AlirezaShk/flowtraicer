@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from xai.core.model import TokenUsage
-from xai.llm import LiteLLMClient, LLMResult
+from ft.core.model import TokenUsage
+from ft.llm import LiteLLMClient, LLMResult
 
 
 def _fake_response():

@@ -1,4 +1,4 @@
-"""Drive a LangGraph run and record it into the xai trace.
+"""Drive a LangGraph run and record it into the FlowTraicer trace.
 
 Consumes ``compiled.astream(stream_mode="debug")``, which emits a ``task`` chunk when a
 node is entered and a ``task_result`` chunk when it exits. Each node becomes a

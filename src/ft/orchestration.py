@@ -1,6 +1,6 @@
 """A small declarative DSL for building instrumented LangGraph workflows.
 
-Sugar over ``langgraph.StateGraph`` + :func:`xai.langgraph_adapter.run_instrumented`: declare
+Sugar over ``langgraph.StateGraph`` + :func:`ft.langgraph_adapter.run_instrumented`: declare
 steps (with their tools), global steps (intent re-routes), goals, and edges once, and the
 workflow compiles the graph and wires the per-step tools / global nodes / goal nodes into the
 recorder for you — no separate ``node_tools=`` / ``global_nodes=`` / ``goal_nodes=`` bookkeeping.
@@ -40,7 +40,7 @@ class StepContext:
 
     ``await ctx.llm(prompt)`` calls the workflow's LLM client and **records the token usage
     automatically** — the node never shapes ``llm_calls`` by hand. (The state must carry the
-    ``llm_calls`` channel; extend :class:`xai.langgraph_adapter.TraceState`.)
+    ``llm_calls`` channel; extend :class:`ft.langgraph_adapter.TraceState`.)
     """
 
     def __init__(self, llm) -> None:

@@ -1,4 +1,4 @@
-"""TraceState — a reusable base state carrying the xai-drained channels."""
+"""TraceState — a reusable base state carrying the FlowTraicer-drained channels."""
 
 from operator import add
 from typing import Annotated
@@ -6,10 +6,10 @@ from typing import Annotated
 import pytest
 from langgraph.graph import END, START, StateGraph
 
-from xai.core.model import EventKind
-from xai.langgraph_adapter import TraceState, run_instrumented
-from xai.recorder import Recorder
-from xai.store.sqlite import SQLiteStore
+from ft.core.model import EventKind
+from ft.langgraph_adapter import TraceState, run_instrumented
+from ft.recorder import Recorder
+from ft.store.sqlite import SQLiteStore
 
 
 class _MyState(TraceState):
@@ -39,7 +39,7 @@ def _graph():
 @pytest.mark.asyncio
 async def test_inherited_channels_are_drained_by_the_runner():
     store = SQLiteStore()
-    # Note: the xai channels are NOT passed in the initial input — they come from the base.
+    # Note: the FlowTraicer channels are NOT passed in the initial input — they come from the base.
     eid = await run_instrumented(_graph(), {"messages": [], "flag": True}, Recorder(store))
 
     step = store.get_engagement(eid).steps[0]

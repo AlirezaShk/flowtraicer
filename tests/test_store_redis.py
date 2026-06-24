@@ -6,8 +6,8 @@ import fakeredis
 import fakeredis.aioredis
 import pytest
 
-from xai.core.model import EngagementStatus, EventKind, Extraction, StepEvent, StepStatus
-from xai.store.records import (
+from ft.core.model import EngagementStatus, EventKind, Extraction, StepEvent, StepStatus
+from ft.store.records import (
     EngagementEnded,
     EngagementStarted,
     EventRecorded,
@@ -15,7 +15,7 @@ from xai.store.records import (
     StepEnded,
     StepStarted,
 )
-from xai.store.redis import RedisStore
+from ft.store.redis import RedisStore
 
 
 def _redis_store():

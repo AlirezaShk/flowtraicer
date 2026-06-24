@@ -1,11 +1,11 @@
 """A reusable base graph-state carrying the channels the runner drains.
 
-Extend this in your own ``TypedDict`` state so you don't re-declare xai's convention channels
-(and their ``Annotated[..., add]`` reducers) in every project::
+Extend this in your own ``TypedDict`` state so you don't re-declare FlowTraicer's convention
+channels (and their ``Annotated[..., add]`` reducers) in every project::
 
     from typing import Annotated, TypedDict
     from operator import add
-    from xai.langgraph_adapter import TraceState
+    from ft.langgraph_adapter import TraceState
 
     class JourneyState(TraceState):
         messages: Annotated[list, add]   # your domain fields
@@ -13,7 +13,7 @@ Extend this in your own ``TypedDict`` state so you don't re-declare xai's conven
 
 ``messages`` is *not* included here — the runner never reads it; it's a normal LangGraph
 field you own. ``total=False`` so you don't have to seed these channels in the initial input
-(LangGraph initializes the reduced lists). See :mod:`xai.langgraph_adapter.runner` for what
+(LangGraph initializes the reduced lists). See :mod:`ft.langgraph_adapter.runner` for what
 each channel records.
 """
 
@@ -24,7 +24,7 @@ from typing import Annotated, TypedDict
 
 
 class TraceState(TypedDict, total=False):
-    """Base state with the xai channels the runner drains into the trace."""
+    """Base state with the FlowTraicer channels the runner drains into the trace."""
 
     #: ``[{"name": str, "payload"?: dict}]`` -> tool-call events.
     tool_calls: Annotated[list, add]

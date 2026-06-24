@@ -1,4 +1,4 @@
-"""LangGraph adapter: auto-instrument a LangGraph run into the xai trace."""
+"""LangGraph adapter: auto-instrument a LangGraph run into the FlowTraicer trace."""
 
 from .runner import run_instrumented
 from .state import TraceState

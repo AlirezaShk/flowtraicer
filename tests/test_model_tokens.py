@@ -1,6 +1,6 @@
 """Tests for token usage, computed token totals, and abandonment on the model."""
 
-from xai.core.model import (
+from ft.core.model import (
     Engagement,
     EngagementStatus,
     EventKind,

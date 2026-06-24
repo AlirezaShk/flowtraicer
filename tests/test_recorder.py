@@ -1,8 +1,8 @@
 """Tests for the recorder — the fail-open emit contract."""
 
-from xai.core.model import EventKind, Extraction, StepStatus
-from xai.recorder import Recorder
-from xai.store.sqlite import SQLiteStore
+from ft.core.model import EventKind, Extraction, StepStatus
+from ft.recorder import Recorder
+from ft.store.sqlite import SQLiteStore
 
 
 def test_recorder_drives_a_full_engagement():

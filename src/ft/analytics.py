@@ -1,6 +1,6 @@
 """Cross-engagement analytics — funnels, drop-off, and journey grouping.
 
-These read whole engagements from a :class:`~xai.store.base.Store` and roll them up. The
+These read whole engagements from a :class:`~ft.store.base.Store` and roll them up. The
 canonical question for a product built on agent journeys is *"where do users drop off, and
 what did each step cost?"* — :func:`funnel` answers exactly that.
 """
