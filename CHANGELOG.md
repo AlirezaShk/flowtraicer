@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-06-24
+
 ### Added
 - `ft.server.serve(store, host=…, port=…)` — run the trace viewer in one line; FlowTraicer owns
   the uvicorn server, so you no longer build the app and call `uvicorn.run` yourself. `create_app`
