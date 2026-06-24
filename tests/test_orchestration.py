@@ -86,6 +86,39 @@ def _workflow() -> Workflow:
 
 
 @pytest.mark.asyncio
+async def test_workflow_built_once_reused_with_per_run_deps_and_llm():
+    # No construction-time llm: deps + llm are passed per run().
+    wf = Workflow("reuse", state_schema=_LLMState)
+
+    @wf.step
+    async def talk(state, ctx):
+        text = await ctx.llm("hi")  # per-run llm (records tokens)
+        return {
+            "messages": [text],
+            "events": [{"kind": "log", "name": "who", "payload": {"who": ctx.deps["who"]}}],
+        }
+
+    wf.entry("talk")
+    wf.finish("talk")
+
+    store = SQLiteStore()
+    eid1 = await wf.run({"messages": []}, Recorder(store), deps={"who": "alice"}, llm=_stub_llm())
+    compiled1 = wf._compiled
+    eid2 = await wf.run({"messages": []}, Recorder(store), deps={"who": "bob"}, llm=_stub_llm())
+    compiled2 = wf._compiled
+
+    # The graph was compiled exactly once and reused across runs.
+    assert compiled1 is compiled2
+
+    def who(eid):
+        step = store.get_engagement(eid).steps[0]
+        return next(e.payload["who"] for e in step.events if e.name == "who"), step.total_tokens
+
+    assert who(eid1) == ("alice", 8)  # per-run deps + llm both took effect
+    assert who(eid2) == ("bob", 8)
+
+
+@pytest.mark.asyncio
 async def test_dsl_runs_and_records_steps_tools_and_goal():
     store = SQLiteStore()
     eid = await _workflow().run(

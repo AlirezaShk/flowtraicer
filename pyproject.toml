@@ -31,12 +31,11 @@ dependencies = [
     "uvicorn>=0.29",
 ]
 
-# Working name — update owner/repo when the project is published under its final name.
 [project.urls]
-Homepage = "https://github.com/OWNER/flowtraicer"
-Repository = "https://github.com/OWNER/flowtraicer"
-Issues = "https://github.com/OWNER/flowtraicer/issues"
-Changelog = "https://github.com/OWNER/flowtraicer/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/AlirezaShk/flowtraicer"
+Repository = "https://github.com/AlirezaShk/flowtraicer"
+Issues = "https://github.com/AlirezaShk/flowtraicer/issues"
+Changelog = "https://github.com/AlirezaShk/flowtraicer/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Schema extraction. Instructor's `from_provider` is the multi-provider abstraction;

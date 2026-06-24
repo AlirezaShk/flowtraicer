@@ -126,23 +126,122 @@ await run_instrumented(app, state, recorder,
                        goal_nodes={"submitted"})   # didn't reach it -> ABANDONED
 ```
 
-### Free-form LLM calls, any provider (LiteLLM)
+### Free-form LLM calls — bring your own provider
 
-FlowTraicer's core only *records* tokens. For the calls themselves, the optional `ft.llm` helper
-wraps [LiteLLM](https://docs.litellm.ai) so one config targets any provider — and returns
-token usage that drops into `llm_calls`:
+FlowTraicer's core only *records* tokens; **it never imports a specific LLM SDK.** The single
+integration point is the `LLMClient` protocol (`ft.llm.LLMClient`): one async method returning the
+completion text and its token usage.
+
+```python
+from ft.llm import LLMClient   # a runtime_checkable Protocol
+
+class LLMClient(Protocol):
+    async def acomplete(self, messages, **overrides) -> LLMResult: ...   # text + token usage
+```
+
+When a node calls `await ctx.llm(prompt)`, the workflow calls `acomplete` on whatever you passed as
+`llm=` to `Workflow.run(...)`, then records the returned tokens. So you can plug in **any** provider
+or SDK — there's no LiteLLM requirement.
+
+**The bundled option** is `LiteLLMClient`, which wraps [LiteLLM](https://docs.litellm.ai) so one
+config targets 100+ providers (install the `litellm` extra):
 
 ```python
 from ft.llm import LiteLLMClient
 
 llm = LiteLLMClient(provider="openai", model="gpt-5-nano", api_key="XXX")
 # or from a config blob: LiteLLMClient.from_config({"llm_provider": "openai", "model": "...", "key": "..."})
-
-result = llm.complete("Summarize this for the applicant.")
-return {"messages": [result.text], "llm_calls": [result.as_llm_call()]}  # token cost recorded
+engagement_id = await workflow.run(state, recorder, llm=llm)
 ```
 
-Install with the `litellm` extra. (Structured extraction uses Instructor; see below.)
+#### Adding your own provider / SDK
+
+Implement `acomplete` and return an `LLMResult` (reuse it — `TokenUsage` derives `total` from
+`prompt + completion` when you don't set it, and `as_llm_call()` is handled for you):
+
+```python
+from ft.core.model import TokenUsage
+from ft.llm import LLMResult   # any object with `.text` + `.as_llm_call()` works; LLMResult is the easy path
+
+class MyGeminiClient:
+    """Adapt your existing SDK/client to FlowTraicer. `acomplete` is the only method ctx.llm needs."""
+    def __init__(self, sdk):
+        self._sdk = sdk
+
+    async def acomplete(self, messages, **overrides) -> LLMResult:
+        resp = await self._sdk.generate(messages, **overrides)        # however your SDK returns text + usage
+        return LLMResult(
+            text=resp.text,
+            tokens=TokenUsage(prompt=resp.usage.input, completion=resp.usage.output),
+            model=resp.model,
+        )
+
+# isinstance(MyGeminiClient(sdk), LLMClient) is True (structural check), and:
+await workflow.run(state, recorder, llm=MyGeminiClient(sdk))   # tokens flow into every step's trace
+```
+
+Notes:
+- **Sync SDK?** Wrap the blocking call so you don't stall the event loop:
+  `return await anyio.to_thread.run_sync(lambda: self._complete(messages))`.
+- **Capture usage.** The whole point of `ctx.llm` is token accounting — read your SDK's usage
+  field (e.g. Gemini's `response.usage_metadata`, OpenAI's `response.usage`) into `TokenUsage`.
+- **Per-call overrides.** `ctx.llm(prompt, model="…", temperature=0)` forwards `**overrides` to
+  `acomplete`; honor what you support and ignore the rest.
+
+#### Setting a global default provider
+
+Passing `llm=` to every `run()` gets repetitive. Register one **global default** instead — every
+workflow falls back to it when no per-run / per-workflow client is given:
+
+```python
+from ft.llm import LiteLLMClient
+from ft.registry import REGISTER
+
+# LiteLLM is the bundled default provider; register a configured instance once at startup:
+REGISTER.set_llm_provider(LiteLLMClient(provider="openai", model="gpt-5-nano", api_key=KEY))
+# ...or your own client — set_llm_provider VALIDATES it satisfies LLMClient first:
+REGISTER.set_llm_provider(MyGeminiClient(sdk))   # TypeError if it has no async acomplete()
+```
+
+Resolution order when a node calls `ctx.llm`:
+
+```text
+run(llm=…)   >   Workflow(llm=…)   >   REGISTER.get_llm_provider()
+```
+
+So the global is the lowest-priority fallback: a per-run `llm=` (e.g. a request-scoped client)
+always wins. `REGISTER.set_llm_provider` asserts the client exposes a callable, async
+`acomplete(messages, **overrides)` and raises a descriptive `TypeError` otherwise — you can't
+register a provider that won't work at run time.
+
+#### Token usage for LLM calls made *outside* a workflow
+
+Not every LLM call runs inside a `Workflow` — chat replies, voice turns, and one-off extractions
+often call a model directly. Register a global recorder and push their token usage into FlowTraicer
+so it rolls up alongside everything else:
+
+```python
+from ft.core.model import TokenUsage
+from ft.recorder import Recorder
+from ft.registry import REGISTER
+from ft.store.postgres import PostgresStore
+
+REGISTER.set_recorder(Recorder(PostgresStore(DSN)))      # validated on registration
+
+# wherever you make a model call (e.g. inside an SDK adapter), after you have the usage:
+REGISTER.record_llm_usage(
+    "openai/gpt-5-nano",
+    tokens=TokenUsage(prompt=resp.usage.prompt_tokens, completion=resp.usage.completion_tokens),
+    caller="instagram_dm.classifier",        # shows up in the viewer / group_by
+    metadata={"session_id": session_id},
+)
+```
+
+Each call becomes a small self-contained engagement (one `llm_call` event), so per-model /
+per-caller token totals appear in the viewer and `analytics.group_by`. It's **fail-open**: with no
+recorder registered it's a no-op, and a recorder error never propagates into the calling agent.
+
+(Structured extraction uses Instructor; see below.)
 
 ### Per-step schema extraction (Instructor + Pydantic)
 

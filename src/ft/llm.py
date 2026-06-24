@@ -26,7 +26,7 @@ completion function). Install it with the ``litellm`` extra.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from .core.model import TokenUsage
 
@@ -35,7 +35,13 @@ Messages = str | list[dict]
 
 @dataclass
 class LLMResult:
-    """The text + token usage of one completion."""
+    """The text + token usage of one completion.
+
+    The result type :class:`LLMClient` implementations return. It's a plain dataclass — reuse it
+    from any provider adapter (see :class:`LLMClient`) so token accounting is handled for you. The
+    only thing :class:`~ft.orchestration.StepContext.llm` needs from a result is :attr:`text` and
+    :meth:`as_llm_call`; a custom result type that exposes those works too.
+    """
 
     text: str
     tokens: TokenUsage
@@ -50,6 +56,29 @@ class LLMResult:
             "completion_tokens": self.tokens.completion,
             "total_tokens": self.tokens.total,
         }
+
+
+@runtime_checkable
+class LLMClient(Protocol):
+    """The contract a workflow's LLM client must satisfy — **the** integration point.
+
+    FlowTraicer's core is provider-agnostic: it only *records* token counts. ``ctx.llm(prompt)``
+    (see :class:`ft.orchestration.StepContext`) calls a single async method on whatever object you
+    pass as ``llm=`` to :meth:`ft.orchestration.Workflow.run`::
+
+        result = await client.acomplete(prompt)   # -> LLMResult (text + token usage)
+
+    So to plug in **any** provider or SDK — your own Gemini/OpenAI/Anthropic wrapper, a gateway, a
+    fake for tests — implement this one method and return an :class:`LLMResult` (or any object with
+    ``.text`` and ``.as_llm_call()``). :class:`LiteLLMClient` below is the *bundled* implementation,
+    not a requirement; nothing in the core imports a specific provider. Because this is
+    ``runtime_checkable``, ``isinstance(obj, LLMClient)`` is a structural (``acomplete``-present)
+    check.
+    """
+
+    async def acomplete(self, messages: Messages, **overrides) -> LLMResult:
+        """Run one completion and return its text + token usage."""
+        ...
 
 
 def _normalize(messages: Messages) -> list[dict]:

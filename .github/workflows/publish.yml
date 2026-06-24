@@ -1,0 +1,77 @@
+name: Publish to PyPI
+
+# Publishes flowtraicer to PyPI when a GitHub Release is published.
+# Uses PyPI Trusted Publishing (OIDC) — no API token/secret is stored in the repo.
+#
+# One-time setup on PyPI (https://pypi.org/manage/account/publishing/):
+#   Add a "pending publisher" for project `flowtraicer` with:
+#     Owner: AlirezaShk   Repository: flowtraicer
+#     Workflow name: publish.yml   Environment: pypi
+# After the first successful publish, the project's trusted publisher is permanent.
+#
+# Release flow: bump `version` in pyproject.toml -> tag (e.g. v0.0.1) ->
+# create a GitHub Release for that tag. This workflow then builds & publishes.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: # allow a manual run (build artifacts; publish still gated by environment)
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & test distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install (with test extras)
+        run: pip install -e ".[dev,litellm]"
+
+      - name: Sanity — lint, import, test
+        run: |
+          ruff check .
+          python -c "import ft; from ft.registry import REGISTER; from ft.llm import LLMClient; print('ft import OK')"
+          pytest -q
+
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+
+      - name: Check metadata renders on PyPI
+        run: |
+          python -m pip install --upgrade twine
+          twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    # Only publish for an actual release event (not manual builds).
+    if: github.event_name == 'release'
+    environment:
+      name: pypi
+      url: https://pypi.org/p/flowtraicer
+    permissions:
+      id-token: write # OIDC token for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
