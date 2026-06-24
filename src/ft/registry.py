@@ -31,7 +31,11 @@ from .llm import LLMClient
 
 #: The recorder methods :meth:`_Registry.record_llm_usage` relies on (duck-typed Recorder).
 _RECORDER_METHODS = (
-    "start_engagement", "start_step", "record_llm_call", "end_step", "end_engagement",
+    "start_engagement",
+    "start_step",
+    "record_llm_call",
+    "end_step",
+    "end_engagement",
 )
 
 
