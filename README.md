@@ -36,8 +36,6 @@ pip install -e ".[dev]"            # core + test deps
 pip install -e ".[extraction,openai]"   # + Instructor extraction with the OpenAI SDK
 ```
 
-(Requires Python ≥ 3.11. The package imports as `FlowTraicer` regardless of the `src/` layout.)
-
 ## Getting started: instrument a LangGraph agent
 
 ```python
