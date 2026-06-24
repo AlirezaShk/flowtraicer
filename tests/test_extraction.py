@@ -1,5 +1,6 @@
 """Tests for the Instructor-powered extraction helper (offline — fake clients)."""
 
+import pytest
 from pydantic import BaseModel
 
 from ft.extraction import ExtractionResult, Extractor
@@ -92,6 +93,9 @@ async def test_aextract_awaits_async_client():
 
 
 def test_from_provider_wires_instructor(monkeypatch):
+    instructor = pytest.importorskip(
+        "instructor", reason="install the `extraction` extra to test Extractor.from_provider"
+    )
     captured = {}
     sentinel = object()
 
@@ -100,8 +104,6 @@ def test_from_provider_wires_instructor(monkeypatch):
         captured["async_client"] = async_client
         captured["kwargs"] = kwargs
         return sentinel
-
-    import instructor
 
     monkeypatch.setattr(instructor, "from_provider", fake_from_provider)
     extractor = Extractor.from_provider("openai/gpt-4o-mini", temperature=0)
