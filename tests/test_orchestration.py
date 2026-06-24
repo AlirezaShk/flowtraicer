@@ -1,12 +1,14 @@
 """Tests for the Workflow orchestration DSL (sugar over LangGraph + run_instrumented)."""
 
 from operator import add
+from types import SimpleNamespace
 from typing import Annotated, TypedDict
 
 import pytest
 
 from xai.core.model import EngagementStatus, EventKind
-from xai.langgraph_adapter import read_topology
+from xai.langgraph_adapter import TraceState, read_topology
+from xai.llm import LiteLLMClient
 from xai.orchestration import Workflow
 from xai.recorder import Recorder
 from xai.store.sqlite import SQLiteStore
@@ -16,6 +18,41 @@ class _State(TypedDict):
     messages: Annotated[list, add]
     tool_calls: Annotated[list, add]
     route: str
+
+
+def _stub_llm() -> LiteLLMClient:
+    async def _acompletion(**kwargs):
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="hi there"))],
+            usage=SimpleNamespace(prompt_tokens=5, completion_tokens=3, total_tokens=8),
+        )
+
+    return LiteLLMClient(provider="stub", model="m", _acompletion=_acompletion)
+
+
+class _LLMState(TraceState):
+    messages: Annotated[list, add]
+
+
+@pytest.mark.asyncio
+async def test_workflow_injects_llm_and_auto_records_tokens():
+    wf = Workflow("talk", state_schema=_LLMState, llm=_stub_llm())
+
+    @wf.step
+    async def talk(state, ctx):
+        text = await ctx.llm("say hi")  # injected client; token cost auto-recorded
+        return {"messages": [text]}
+
+    wf.entry("talk")
+    wf.finish("talk")
+
+    store = SQLiteStore()
+    eid = await wf.run({"messages": []}, Recorder(store))
+
+    step = store.get_engagement(eid).steps[0]
+    llm_events = [e for e in step.events if e.kind is EventKind.LLM_CALL]
+    assert len(llm_events) == 1
+    assert step.total_tokens == 8
 
 
 def _workflow() -> Workflow:

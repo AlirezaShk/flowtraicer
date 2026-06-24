@@ -25,6 +25,7 @@ engagement_id = await wf.run(initial_state, recorder, metadata={"user_id": "u1"}
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable, Iterable
 from typing import Any
 
@@ -32,6 +33,34 @@ from langgraph.graph import END, START, StateGraph
 
 from .langgraph_adapter import run_instrumented
 from .recorder import Recorder
+
+
+class StepContext:
+    """Per-step context handed to a node that declares a second parameter.
+
+    ``await ctx.llm(prompt)`` calls the workflow's LLM client and **records the token usage
+    automatically** — the node never shapes ``llm_calls`` by hand. (The state must carry the
+    ``llm_calls`` channel; extend :class:`xai.langgraph_adapter.TraceState`.)
+    """
+
+    def __init__(self, llm) -> None:
+        self._llm = llm
+        self._llm_calls: list[dict] = []
+
+    async def llm(self, prompt, *, model: str | None = None, **kwargs) -> str:
+        """Run an LLM turn via the workflow's client; return the text, record the tokens."""
+        if self._llm is None:
+            raise RuntimeError(
+                "this Workflow has no llm client; pass Workflow(..., llm=...) to use ctx.llm"
+            )
+        if model is not None:
+            kwargs["model"] = model
+        result = await self._llm.acomplete(prompt, **kwargs)
+        self._llm_calls.append(result.as_llm_call())
+        return result.text
+
+    def _drain(self) -> list[dict]:
+        return list(self._llm_calls)
 
 
 class Workflow:
@@ -43,9 +72,11 @@ class Workflow:
         *,
         state_schema: type,
         goal_nodes: Iterable[str] = (),
+        llm: Any = None,
     ) -> None:
         self.name = name
         self._state_schema = state_schema
+        self._llm = llm
         self._goal_nodes = set(goal_nodes)
         self._nodes: dict[str, Callable] = {}
         self._tools: dict[str, list[str]] = {}
@@ -107,13 +138,31 @@ class Workflow:
 
     # -- build / run ----------------------------------------------------------
 
+    def _wrap(self, func: Callable) -> Callable:
+        """Wrap a node so it receives a :class:`StepContext` (if it declares one) and the
+        LLM calls it made via ``ctx`` are merged into the node's state writes."""
+        wants_ctx = len(inspect.signature(func).parameters) >= 2
+
+        async def wrapped(state):
+            ctx = StepContext(self._llm)
+            result = func(state, ctx) if wants_ctx else func(state)
+            if inspect.isawaitable(result):
+                result = await result
+            result = dict(result or {})
+            calls = ctx._drain()
+            if calls:
+                result["llm_calls"] = list(result.get("llm_calls", [])) + calls
+            return result
+
+        return wrapped
+
     def compile(self):
         """Compile to a LangGraph ``CompiledStateGraph`` (cached)."""
         if self._compiled is not None:
             return self._compiled
         graph = StateGraph(self._state_schema)
         for node, func in self._nodes.items():
-            graph.add_node(node, func)
+            graph.add_node(node, self._wrap(func))
         if self._entry is not None:
             graph.add_edge(START, self._entry)
         for source, target in self._edges:
