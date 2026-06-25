@@ -1,3 +1,3 @@
 """FlowTraicer — map, visualize, monitor, debug, log and audit agentic AI engagements."""
 
-__version__ = "0.9.2"
+__version__ = "0.11.1"

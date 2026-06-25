@@ -25,7 +25,7 @@ _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 class PostgresStore:
     """Append-only trace store backed by Postgres (JSONB + LISTEN/NOTIFY)."""
 
-    def __init__(self, dsn: str | None = None, *, conn=None, table: str = "xai_records") -> None:
+    def __init__(self, dsn: str | None = None, *, conn=None, table: str = "ft_records") -> None:
         if not _IDENT.match(table):
             raise ValueError(f"invalid table name: {table!r}")
         self._dsn = dsn

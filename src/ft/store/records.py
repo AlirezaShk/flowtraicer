@@ -94,6 +94,18 @@ class EngagementEnded(_BaseRecord):
     dropped_at: str | None = None
 
 
+class EngagementStatusChanged(_BaseRecord):
+    """A non-terminal engagement status transition (e.g. ACTIVE <-> PAUSED).
+
+    Used by human-in-the-loop pause/resume: pausing records ``PAUSED`` (without ending the
+    engagement); resuming records ``ACTIVE`` again. Terminal states are still recorded with
+    :class:`EngagementEnded`. See ``docs/2026-06-25-checkpoint-resume-design.md``.
+    """
+
+    type: Literal["engagement_status_changed"] = "engagement_status_changed"
+    status: EngagementStatus
+
+
 Record = Annotated[
     EngagementStarted
     | StepStarted
@@ -101,7 +113,8 @@ Record = Annotated[
     | ExtractionRecorded
     | IntentSwitched
     | StepEnded
-    | EngagementEnded,
+    | EngagementEnded
+    | EngagementStatusChanged,
     Field(discriminator="type"),
 ]
 

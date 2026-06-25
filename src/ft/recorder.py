@@ -24,6 +24,7 @@ from .core.model import (
 from .store.records import (
     EngagementEnded,
     EngagementStarted,
+    EngagementStatusChanged,
     EventRecorded,
     ExtractionRecorded,
     IntentSwitched,
@@ -183,6 +184,12 @@ class Recorder:
                 duration_ms=duration_ms,
             )
         )
+
+    def set_engagement_status(self, engagement_id: str, status: EngagementStatus) -> None:
+        """Record a **non-terminal** status transition (e.g. ACTIVE<->PAUSED) without ending the
+        engagement. Used by human-in-the-loop pause/resume; terminal states use
+        :meth:`end_engagement`."""
+        self._append(EngagementStatusChanged(engagement_id=engagement_id, status=status))
 
     def end_engagement(
         self,

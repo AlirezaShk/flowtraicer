@@ -8,6 +8,7 @@ from ..core.model import Engagement, Step
 from .records import (
     EngagementEnded,
     EngagementStarted,
+    EngagementStatusChanged,
     EventRecorded,
     ExtractionRecorded,
     IntentSwitched,
@@ -64,6 +65,8 @@ def fold(records: Iterable[Record]) -> Engagement:
                 step.status = rec.status
                 step.ended_at = rec.ended_at
                 step.duration_ms = rec.duration_ms
+        elif isinstance(rec, EngagementStatusChanged):
+            eng.status = rec.status
         elif isinstance(rec, EngagementEnded):
             eng.status = rec.status
             eng.ended_at = rec.ended_at

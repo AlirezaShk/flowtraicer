@@ -36,6 +36,10 @@ class EngagementStatus(str, Enum):
     FAILED = "failed"
     #: The engagement ended without reaching a declared goal node (a drop-off).
     ABANDONED = "abandoned"
+    #: Suspended at a human-in-the-loop interrupt, waiting to be ``resume``d. Not terminal —
+    #: the engagement has not ended; it continues (same id) on the next ``resume`` (see
+    #: ``docs/2026-06-25-checkpoint-resume-design.md``).
+    PAUSED = "paused"
 
 
 class TokenUsage(BaseModel):
@@ -63,6 +67,8 @@ class StepStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
+    #: Parked at a human-in-the-loop interrupt (``ctx.pause``), awaiting the next ``resume``.
+    WAITING = "waiting"
 
 
 class EventKind(str, Enum):

@@ -3,8 +3,10 @@
 Thanks for your interest! `FlowTraicer` is a small, focused library — contributions that keep it
 that way (clear boundaries, tested, documented) are very welcome.
 
-> **Note:** `FlowTraicer` is a working name and will be renamed before the first public release. The
-> package imports as `FlowTraicer` today; if you reference it, expect a rename.
+> **Note:** `FlowTraicer` is the project's working name and will be renamed before the first
+> public release. The **import name is `ft`** today (e.g. `from ft.orchestration import Workflow`),
+> and the distribution is `flowtraicer` (`pip install flowtraicer`). The `ft` import name is
+> authoritative; if you reference it, expect a rename of the *project*, not necessarily the import.
 
 ## Development setup
 

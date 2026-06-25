@@ -274,6 +274,46 @@ return {"extraction": result.as_record().model_dump()}
 extractor.extract_and_record(recorder, step_id, BudgetInfo, "Shibuya, around ¥95,000")
 ```
 
+#### Extraction through your injected `ctx.llm` (no second provider)
+
+`Extractor.from_provider(...)` stands up its **own** Instructor client (its own SDK, key, and
+token budget), separate from the `llm=` client you injected for the run. That is convenient for a
+one-off script, but inside a `Workflow` you usually want extraction to go through the **same**
+injected `ctx.llm` so it shares the request's model, key, and token accounting.
+
+The supported pattern is: **do the structured call yourself via `ctx.llm`, then record it via the
+`extraction` state key** — the `from_provider` extractor is optional sugar, not the only path.
+`ctx.llm` records the token usage automatically (it's a normal `ctx.llm` call), and the returned
+`extraction` dict is folded onto the step:
+
+```python
+import json
+from pydantic import BaseModel
+
+class BudgetInfo(BaseModel):
+    budget: int
+    area: str
+
+@wf.step
+async def criteria(state, ctx):
+    user_text = state["messages"][-1]
+    # One LLM turn through the INJECTED client — tokens roll into this step automatically.
+    raw = await ctx.llm(
+        "Extract the budget (JPY int) and area as JSON matching "
+        f'{json.dumps(BudgetInfo.model_json_schema())}. Text: "{user_text}"'
+    )
+    values = BudgetInfo.model_validate_json(raw).model_dump()
+    return {
+        # the extraction is recorded on this step, using the run's model + budget:
+        "extraction": {"schema_name": "BudgetInfo", "values": values},
+    }
+```
+
+Use `Extractor.from_provider(...)` when you *want* a dedicated extraction provider (a cheaper or
+more reliable model than the chat model, billed separately); use the `ctx.llm` + `extraction`-key
+pattern above when extraction should share the run's injected client, model, and token budget. Both
+end up recorded identically as the step's `Extraction` — readers can't tell which path produced it.
+
 ## Declarative workflows (the DSL)
 
 `ft.orchestration.Workflow` is sugar over LangGraph: declare steps (with tools), global
@@ -301,6 +341,287 @@ engagement_id = await wf.run(initial_state, recorder, metadata={"user_id": "u1"}
 
 (The hand-wired `run_instrumented` approach still works; the DSL is optional sugar.)
 
+### Pausing for human input and resuming across turns (human-in-the-loop)
+
+`run()` executes the graph to completion in one call and returns the engagement id. A multi-turn
+chat instead advances **one human exchange per HTTP request**: a node emits something (a card),
+**stops to wait** for the user's reply, and **resumes** on a *later request* (possibly a different
+process) — as the **same** engagement. Use `start` / `resume`, keyed by a stable `thread_id` (your
+chat session id), with a node that calls `ctx.pause(...)`:
+
+```python
+from ft.orchestration import Workflow
+
+wf = Workflow("qualification_chat", state_schema=State)   # optional: checkpointer=build_checkpointer("postgres", dsn=DSN)
+
+@wf.step
+async def qualify(state, ctx):
+    card = build_qualification_card(state)               # your render-ready payload
+    reply = await ctx.pause(awaiting="qualification_confirm", payload=card)  # ── stops here ──
+    # On resume, `reply` is whatever resume(input=...) supplied. Normalise the two channels:
+    confirmed = bool(reply.get("confirm")) or reply.get("text", "").lower() in {"yes", "y"}
+    return {"messages": [f"qualified={confirmed}"]}
+
+@wf.step
+async def answer(state, ctx): ...
+
+wf.entry("qualify"); wf.edge("qualify", "answer"); wf.finish("answer")
+
+# turn 1 (HTTP request 1): runs until the card pauses
+turn = await wf.start(initial_state, recorder, thread_id=session_id, llm=llm, deps=deps)
+# turn.status == "paused"; turn.awaiting == "qualification_confirm"; turn.interrupt == card
+#   -> render turn.interrupt to the user; return the HTTP response.
+
+# turn N (a later HTTP request): the user clicked confirm (or typed "yes")
+turn = await wf.resume(thread_id=session_id, recorder=recorder, input={"confirm": True},
+                      llm=llm, deps=deps)
+# turn.status == "completed"; turn.engagement_id is the SAME engagement as turn 1.
+```
+
+Both return a `WorkflowTurn`:
+
+| field | meaning |
+|---|---|
+| `status` | `"paused"` (render `interrupt`, collect input for the next `resume`) or `"completed"` |
+| `engagement_id` | the **one** engagement spanning all turns of this session |
+| `thread_id` | the session id you keyed on |
+| `awaiting` | the label the paused node is waiting on (`ctx.pause(awaiting=…)`) |
+| `interrupt` | the payload the paused node emitted — the **unwrapped** `payload` dict (the card) |
+| `token_usage` | `TokenUsage` for **only the steps advanced this turn** (charge your per-turn budget off `turn.token_usage.total`) |
+
+#### The resume contract (double-submit, wrong turn, empty input, chained pauses)
+
+`/api/chat` is concurrent and clients double-submit and replay stale turns, so the edge cases are
+nailed down:
+
+- **`turn.interrupt` is the *unwrapped* `payload`.** It is exactly the dict you passed to
+  `ctx.pause(payload=…)` — `MessageForm.model_validate(turn.interrupt)` is safe with no unwrapping.
+  The `awaiting` label is on `turn.awaiting`, never folded into `interrupt`.
+- **`resume()` raises `ResumeError` (a `RuntimeError` subclass) with a `.reason`** when the thread
+  can't be resumed as asked, so a router can branch on it:
+
+  ```python
+  from ft.orchestration import ResumeError
+  try:
+      turn = await wf.resume(thread_id=session_id, recorder=recorder, input=reply,
+                            expect_awaiting="qualification_confirm")
+  except ResumeError as e:
+      if e.reason == "no_resumable_engagement":   # already completed / never started (double-submit)
+          ...   # re-render the latest persisted message; do NOT re-run the flow
+      elif e.reason == "awaiting_mismatch":        # stale client delivering wrong-turn input
+          ...   # re-render the card the graph is actually parked on
+      # e.reason is also "not_paused" (the engagement exists but isn't parked at a pause)
+  ```
+
+  - `reason="no_resumable_engagement"` — no in-flight engagement for this `thread_id` (never
+    started, **or already completed/abandoned/failed** — the double-submit / stale-replay case).
+  - `reason="not_paused"` — the engagement exists but isn't parked at a pause right now.
+  - `reason="awaiting_mismatch"` — the optional `expect_awaiting="…"` guard didn't match the label
+    the graph is actually parked on. The check runs *before* any input is delivered, so a stale
+    client can't push wrong-turn input through.
+- **`resume(input=None)`** (a bare resume) makes `ctx.pause(...)` return **`None`** (not `{}`) —
+  guard with `reply or {}` if your node assumes a dict.
+- **Chained pauses.** A single `resume` can itself return `status="paused"` again at a *different*
+  node. Drive an N-card flow as a loop:
+
+  ```python
+  turn = await wf.start(initial_state, recorder, thread_id=session_id, llm=llm)
+  while turn.is_paused:                 # each card is one HTTP turn in production
+      render(turn.interrupt)            # show the card; collect the reply (next request)
+      turn = await wf.resume(thread_id=session_id, recorder=recorder, input=collect_reply())
+  # turn.status == "completed"
+  ```
+- **Cardless pauses (hand the turn back with no card).** `ctx.pause(awaiting=…, payload=None)` (or
+  `payload` omitted) is a valid pause that carries **no** card: `turn.interrupt is None` (and the
+  streaming terminal `paused` event likewise carries no card). Use it for a node that pauses purely
+  to **await the next user message** — emit only your streamed answer + `usage`, no `message_form`:
+
+  ```python
+  @wf.step
+  async def await_user(state, ctx):
+      await ctx.pause(awaiting="user_turn")    # no payload → turn.interrupt is None
+      return {}
+  ```
+
+  This lets the **whole chat session map to one FT engagement**: after each agentic answer, pause
+  to await input and resume back into the agentic step (a re-entrant loop), so the engagement stays
+  `PAUSED` between turns and never finishes. (`resume(input=None)` then makes the next
+  `ctx.pause(...)` return `None`.) Per-turn `token_usage` stays scoped to each turn's steps. Put the
+  streamed answer in the node *after* the cardless pause (so it streams/charges once on each
+  re-entry — the replay rule). Runnable: `python -m ft.examples.session_loop`.
+
+Notes:
+
+- **Checkpointer = resumable execution state; trace store = audit log.** They are separate
+  backends. `ctx.pause` wraps LangGraph's `interrupt()`; the resume state lives in a checkpointer
+  keyed by `thread_id`, while the trace store records the journey keyed by `engagement_id` (joined
+  to the thread via `metadata["ft_thread_id"]`). Pick a checkpointer with
+  `ft.checkpoint.build_checkpointer("memory"|"sqlite"|"postgres", …)` or pass any LangGraph
+  `BaseCheckpointSaver` as `checkpointer=`. The **default is an in-process `MemorySaver`** — fine
+  for dev / a single worker (the session must stick to one process); use `"sqlite"`/`"postgres"`
+  for durable cross-process resume. `build_checkpointer` **provisions the saver's tables on first
+  build** (runs its idempotent `.setup()`; pass `setup=False` to skip if you migrate them yourself);
+  the checkpoint tables can share the FT trace DB cleanly (distinct table names) — see
+  [`src/ft/checkpoint.py`](src/ft/checkpoint.py).
+- **The paused engagement is `PAUSED`, not ended** — it is never purged by retention, and the
+  resumed steps record under the same `engagement_id`. The reconstructed trace shows one journey:
+  the paused node `WAITING`, then re-run and `COMPLETED`, then the downstream nodes.
+- **`ctx.pause` re-runs the node from its top on resume.** LangGraph replays the interrupted node,
+  and `interrupt()` returns the resume value the second time — so keep work *before* `ctx.pause`
+  idempotent (side effects there will run again on resume).
+- A runnable example is `python -m ft.examples.hitl_resume` (single pause) and
+  `python -m ft.examples.streaming_turn` (chained pauses + streaming). Full design:
+  [`docs/2026-06-25-checkpoint-resume-design.md`](docs/2026-06-25-checkpoint-resume-design.md).
+
+### Streaming a turn incrementally (NDJSON / `StreamingResponse`)
+
+`start`/`resume` return one `WorkflowTurn` at the *end* of the turn. For a chat endpoint that
+streams tokens and events to the client as work happens, use the async-generator counterparts
+`stream` / `stream_resume` — same arguments, same paused/completed boundary, but they **yield
+`StreamEvent`s as the turn executes**:
+
+```python
+from ft.orchestration import Workflow
+
+wf = Workflow("streaming_chat", state_schema=State)
+
+@wf.step
+async def answer(state, ctx):
+    text = await ctx.llm("Summarise the plan.", stream=True)   # tokens stream out as they arrive
+    return {"messages": [text]}
+
+# Inside a FastAPI generator → produce the existing NDJSON contract:
+async def event_stream():
+    async for ev in wf.stream_resume(thread_id=session_id, recorder=recorder, input=reply, llm=llm):
+        if ev.kind == "step_started":
+            yield ndjson({"type": "status", "label": ev.data["node"]})
+        elif ev.kind == "token":
+            yield ndjson({"type": "text_chunk", "text": ev.data["text"]})
+        elif ev.kind == "emit":                      # a card pushed mid-turn via ctx.emit(...)
+            yield ndjson({"type": "message_form", "form": ev.data})
+        elif ev.kind in ("paused", "completed"):     # the TERMINAL event carries the WorkflowTurn
+            turn = ev.turn
+            if turn.is_paused:
+                yield ndjson({"type": "message_form", "form": turn.interrupt})   # the card
+            yield ndjson({"type": "usage", "total": turn.token_usage.total})     # per-turn tokens
+
+return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+```
+
+`StreamEvent.kind` is `step_started` / `token` / `emit` / `step_finished`, terminated by exactly one
+`paused` or `completed` event whose `ev.turn` is the resulting `WorkflowTurn`. Details:
+
+| `ev.kind` | `ev.data` | when |
+|---|---|---|
+| `step_started` / `step_finished` | `{"node": …}` | a node entered / exited |
+| `token` | `{"text": …}` | a streamed chunk from `ctx.llm(prompt, stream=True)` |
+| `emit` | the payload | a mid-turn `ctx.emit(payload)` (a card that does **not** pause) |
+| `paused` / `completed` | `{}` / `{"awaiting": …}` | terminal; `ev.turn` is the `WorkflowTurn` |
+
+- **`ctx.llm(prompt, stream=True)`** consumes the client's `astream(...)` (it must yield text chunks
+  then a final `LLMResult` for usage), surfaces each chunk as a `token` event, and **still records
+  the tokens** into the step trace and `turn.token_usage` — streaming and non-streaming account
+  tokens identically. (A client with no `astream` falls back to a normal `acomplete`.)
+- **`ctx.emit(payload)`** pushes a render-ready payload to the iterator *without* pausing (use it
+  for a card mid-turn; a card that coincides with a wait should use `ctx.pause(payload=…)`, which
+  surfaces on the terminal `turn.interrupt`). Outside a streaming run, `ctx.emit` is a no-op.
+- **Replay rule (streaming under pause/resume).** A node re-runs from its top on resume, so its
+  `ctx.llm(stream=True)` chunks before a `ctx.pause` will re-stream on the resuming turn. Put the
+  streamed answer *after* the last `ctx.pause` in the node (or in a downstream node) so tokens
+  stream exactly once. Per-turn token accounting follows the same rule — pre-pause `ctx.llm` work is
+  discarded by LangGraph on the pausing turn and recorded only when the node replays to completion,
+  so tokens are counted once, on the turn the node actually finishes.
+
+#### Resume-or-start dispatch (when the endpoint doesn't track session start)
+
+An HTTP endpoint often doesn't independently know whether a session already has a paused engagement.
+The blessed idiom is **try `stream_resume`, and on
+`ResumeError(reason="no_resumable_engagement")` fall back to `stream`** (a fresh start) — no
+out-of-band "has this thread started?" lookup against the store:
+
+```python
+from ft.orchestration import ResumeError
+
+async def event_stream():
+    try:
+        agen = wf.stream_resume(thread_id=session_id, recorder=recorder, input=reply, llm=llm)
+        async for ev in agen:
+            yield to_ndjson(ev)
+    except ResumeError as e:
+        if e.reason != "no_resumable_engagement":
+            raise                              # not_paused / awaiting_mismatch → handle as a stale turn
+        # No resumable engagement for this thread → it's a new (or restarted) session: start it.
+        async for ev in wf.stream(initial_state, recorder, thread_id=session_id, llm=llm):
+            yield to_ndjson(ev)
+```
+
+The same try-`resume`/except-`no_resumable_engagement`→`start` shape applies to the non-streaming
+`resume`/`start`. (`reason="no_resumable_engagement"` also covers an *already-completed* thread —
+the double-submit / stale-replay case — so distinguish a genuine "start over" from a duplicate of a
+finished turn with your own per-turn idempotency key if that matters to you.)
+
+### A multi-tool agentic step (the model chooses among many tools in a loop)
+
+For an open-ended phase where the model picks among **many** tools turn after turn (a ReAct loop),
+declare an `@wf.agent_step` and bind **executable** tools to it. FT runs the propose→execute→feed
+-back loop and records each tool call + LLM round under the one step — no hand-coded fixed service
+call per node.
+
+The tool contract (`ft.agent.AgentTool`) is **app-agnostic** — FT imports no app types:
+
+```python
+from ft.agent import AgentTool
+from ft.orchestration import Workflow
+
+async def search_schools(args, ctx):           # handler(args: dict, ctx) -> JSON-serializable
+    svc = ctx.deps["school_service"]            # reach request-scoped services via ctx.deps
+    return await svc.search(area=args["area"])
+
+TOOLS = [
+    AgentTool(name="search_schools", description="Search language schools by area.",
+              parameters={"type": "object", "properties": {"area": {"type": "string"}}},
+              handler=search_schools),
+    AgentTool(name="compare_schools", description="Compare two schools.",
+              parameters={"type": "object", "properties": {"a": {"type": "string"},
+                                                            "b": {"type": "string"}}},
+              handler=compare_schools),
+    # … as many as you like
+]
+
+wf = Workflow("school_qa", state_schema=State)
+
+@wf.agent_step(tools=TOOLS, max_iterations=8)
+async def qa(state, ctx):
+    answer = await ctx.run_tools(state["messages"])   # loops; records each tool_call + llm_call
+    return {"messages": [answer]}
+```
+
+- **`ctx.run_tools(messages)`** runs the bounded ReAct loop with the run's `ctx.llm` client and the
+  step's tools, returning the model's final text. The client must accept a `tools=` kwarg on
+  `acomplete` and may return `LLMResult.tool_calls` (a list of `ft.llm.ToolRequest`); FT executes
+  each requested tool's `handler(args, ctx)`, records it as a `tool_call` and each model round as an
+  `llm_call` **under this step**, feeds the result back, and repeats until the model returns a final
+  answer or `max_iterations` rounds elapse. Its tokens roll into `step.total_tokens` and
+  `turn.token_usage`.
+- **The tool *names*** are also registered as the step's available-tools (for the trace/topology),
+  exactly like `@wf.step(tools=[…])`.
+- **`ctx.emit(...)` works from inside a tool handler.** The `ctx` passed to `handler(args, ctx)` is
+  the **running step's context** — the same one the node body has — so a tool that produces a
+  render-ready card can push it to the caller mid-loop via `ctx.emit(payload)`. It surfaces as an
+  `emit` `StreamEvent` during `stream` / `stream_resume` (interleaved with the loop's tool calls),
+  and is a harmless no-op under non-streaming `run` / `start` / `resume`:
+
+  ```python
+  async def compare_schools(args, ctx):
+      result = await ctx.deps["school_service"].compare(args["a"], args["b"])
+      ctx.emit({"type": "school_comparison", "schools": result})   # mid-loop render card → emit event
+      return {"winner": result["winner"]}                          # what the model reads
+  ```
+
+- **Replay rule.** Under pause/resume a node re-runs from its top, so a tool with side effects will
+  re-execute. Keep tool side effects idempotent, or place the agentic step *after* any `ctx.pause`
+  so its loop runs exactly once. A runnable example is `python -m ft.examples.agentic_step`.
+
 ## Storage backends
 
 The `Store` is pluggable (append-only: write a record, reconstruct an engagement, list
@@ -321,6 +642,74 @@ store = PostgresStore("postgresql://localhost/FlowTraicer")  # durable JSONB + L
 - **SQLite** — local dev, single process, audit-friendly append-only file.
 - **Redis** — cross-process live monitoring (recorder and viewer can be separate services).
 - **Postgres** — durable + queryable for production, with `LISTEN/NOTIFY` live updates.
+
+## Operational model (lifecycle, concurrency, embedding)
+
+This section is the intended *operational contract* for running FlowTraicer inside a long-lived,
+concurrent service (e.g. a FastAPI app) rather than a one-off script.
+
+### Recorder / Store lifecycle
+
+- **Build one `Recorder(Store)` per process and share it.** The `Workflow`, the `Recorder`, and the
+  `Store` are all **build-once, app-scoped singletons** — construct them at startup and reuse them
+  across every request. There is no per-request construction; per-request data flows through
+  `run(...)` / `start(...)` / `resume(...)` (`input`, `llm`, `deps`, `thread_id`, `metadata`).
+- **The store owns a single backing connection.** `SQLiteStore` and `PostgresStore` each hold one
+  synchronous connection (`SQLiteStore` opens it with `check_same_thread=False`); `RedisStore`
+  holds one client. `append`/`get_engagement`/`list_engagements` are **synchronous and
+  non-blocking-ish** (a single local insert/select); they do not `await` mid-operation.
+- **Closing.** Call `store.close()` on shutdown. The `Recorder` itself holds no OS resources.
+
+### Concurrency safety under many concurrent `run()`s
+
+- **Single event loop (the normal FastAPI case): safe.** Each `append` is a synchronous
+  insert+commit with no `await` inside it, so concurrent `run()`/`start()`/`resume()` coroutines on
+  one loop interleave only *between* appends — the store is never re-entered mid-write. The
+  `Recorder` keys every event by an explicit `engagement_id`/`step_id`, so concurrent engagements
+  never alias each other's records.
+- **Multiple OS threads sharing one store: not guaranteed.** The single DB-API connection is not
+  meant to be written from multiple threads simultaneously (Python's `sqlite3` is `threadsafety=1`;
+  `psycopg` connections are likewise single-owner). If you run several event loops in separate
+  threads, give each its own `Store`/`Recorder` (they can point at the same SQLite file / Postgres
+  DB), or front the store with your own lock. For production scale-out, use `PostgresStore` (or
+  `RedisStore`) so multiple *processes* each hold their own connection to the shared database.
+- **Recorder memory note.** The `Recorder` keeps a small in-memory `step_id -> engagement_id` map
+  so callers can record events by step alone. It grows with the number of steps started in the
+  process lifetime; it is not currently evicted. For a hot, long-lived endpoint this is bounded by
+  your traffic — if it matters, run the recorder in a worker you recycle, or use
+  `recorder.record_*` overloads that you can scope. (A bounded/evicting map is a tracked follow-up.)
+
+### Long-lived `active` / `paused` engagements
+
+A multi-turn chat engagement stays open across many HTTP requests (see the pause/resume section
+below). That is expected and supported:
+
+- An engagement that has not ended stays `ACTIVE` (or `PAUSED` while waiting for human input).
+  **Retention never purges a non-completed engagement** (`RetentionPolicy` / `purge_before` only
+  drop engagements past their window that have *ended*), so an engagement open for hours/days and
+  resumed N times is safe from purge.
+- The **resumable execution state** (LangGraph checkpoints) lives in the *checkpointer*, which is
+  **separate** from the trace store (see "Pausing and resuming" below). The trace store is the
+  audit log; the checkpointer is the resume buffer.
+
+### Embedding FlowTraicer behind a feature flag, alongside an existing loop
+
+FlowTraicer is happy being **one of two engines** behind a flag for the same surface — you can run
+the FT `Workflow` for some turns/personas and your legacy loop for others, both writing to the same
+chat session.
+
+- **FT's store is observability/audit, not your system of record.** The trace store records *what
+  happened* (steps, tokens, extractions, drop-off) for monitoring, debugging, and analytics. Your
+  application remains the **system of record** for chat history (`ChatSession` / `ChatMessage`,
+  message `form`s, etc.). Do not read chat history *back* out of the FT store to render to users —
+  persist your messages in your own tables as you do today, and let FT trace alongside.
+- **Align FT threads to your sessions via `thread_id` + `metadata`.** Start/resume an engagement
+  keyed by your app's `session_id` (pass it as `thread_id=` to `start`/`resume`, and put
+  `session_id`/`user_id` in `metadata`). That is the supported way to make "one app session = one FT
+  engagement" so the trace and your session line up 1:1, while the two stores stay independent.
+- **Flagging one persona.** Per request, branch on your flag: FT engine vs. legacy loop. Because the
+  FT store is independent and fail-open, turning FT on/off for a persona never touches your chat
+  persistence or the other personas' behaviour.
 
 ## Audit & retention
 

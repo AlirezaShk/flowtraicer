@@ -25,12 +25,27 @@ completion function). Install it with the ``litellm`` extra.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from .core.model import TokenUsage
 
 Messages = str | list[dict]
+
+
+@dataclass
+class ToolRequest:
+    """One tool invocation the model asked for, in a tool-calling completion.
+
+    Provider-agnostic: an :class:`LLMClient` that supports tool-calling parses its provider's
+    function-call response into this shape, and :meth:`ft.orchestration.StepContext.run_tools`
+    executes each one. ``id`` is the provider's call id (echoed back when feeding the result), if
+    the provider uses one.
+    """
+
+    name: str
+    args: dict = field(default_factory=dict)
+    id: str | None = None
 
 
 @dataclass
@@ -41,12 +56,16 @@ class LLMResult:
     from any provider adapter (see :class:`LLMClient`) so token accounting is handled for you. The
     only thing :class:`~ft.orchestration.StepContext.llm` needs from a result is :attr:`text` and
     :meth:`as_llm_call`; a custom result type that exposes those works too.
+
+    ``tool_calls`` carries any tool invocations the model requested (for the agentic-loop path,
+    :meth:`ft.orchestration.StepContext.run_tools`); a plain text completion leaves it empty.
     """
 
     text: str
     tokens: TokenUsage
     model: str
     raw: Any = None
+    tool_calls: list[ToolRequest] = field(default_factory=list)
 
     def as_llm_call(self, *, name: str | None = None) -> dict:
         """Shape an ``llm_calls`` state entry the LangGraph runner records."""
