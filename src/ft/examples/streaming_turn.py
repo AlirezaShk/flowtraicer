@@ -1,4 +1,4 @@
-"""Streaming a turn incrementally + per-turn tokens + chained pauses (NEEDS.md #2, #8, #13).
+"""Streaming a turn incrementally + per-turn tokens + chained pauses.
 
 ``wf.stream(...)`` / ``wf.stream_resume(...)`` are async generators yielding :class:`StreamEvent`s
 as the turn executes — ``step_started`` / ``token`` / ``emit`` / ``step_finished`` — and ending on

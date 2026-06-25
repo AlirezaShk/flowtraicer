@@ -1,4 +1,4 @@
-"""Multi-tool agentic step (NEEDS.md #5).
+"""Multi-tool agentic step.
 
 A single FlowTraicer step where the model chooses among MANY tools in a ReAct loop
 (propose -> execute -> feed back), instead of one fixed ``ctx.llm`` call. FT runs the loop via

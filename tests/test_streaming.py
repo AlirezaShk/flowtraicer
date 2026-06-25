@@ -1,4 +1,4 @@
-"""Incremental streaming of a turn (NEEDS.md #2).
+"""Incremental streaming of a turn.
 
 ``wf.stream(...)`` / ``wf.stream_resume(...)`` are async generators that yield events as the turn
 executes (step_started, token, emit, step_finished), terminating on the SAME paused/completed

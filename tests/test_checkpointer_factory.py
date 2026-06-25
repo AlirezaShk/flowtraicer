@@ -1,4 +1,4 @@
-"""Checkpointer factory contract, incl. one-time table provisioning (NEEDS.md #E).
+"""Checkpointer factory contract, incl. one-time table provisioning.
 
 ``build_checkpointer(backend, *, setup=True, ...)`` returns a ready-to-use LangGraph saver and, for
 the durable backends, provisions its checkpoint tables (runs the saver's idempotent ``.setup()``)

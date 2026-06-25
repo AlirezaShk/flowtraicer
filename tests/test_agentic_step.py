@@ -1,4 +1,4 @@
-"""Multi-tool agentic step (NEEDS.md #5).
+"""Multi-tool agentic step.
 
 A node where the model chooses among MANY tools in a ReAct loop (propose -> execute -> feed back),
 not a single fixed ctx.llm call. FT runs the loop and records each tool_call + llm_call under the

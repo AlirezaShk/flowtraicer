@@ -1,4 +1,4 @@
-"""Per-turn token accounting (NEEDS.md #8).
+"""Per-turn token accounting.
 
 ``WorkflowTurn.token_usage`` sums tokens for ONLY the steps advanced during THIS start/resume turn,
 not the whole engagement (which spans the multi-turn session).

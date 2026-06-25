@@ -1,4 +1,4 @@
-"""Whole chat session = ONE FT engagement, via a cardless 'await-user' pause (NEEDS.md #14 / #A).
+"""Whole chat session = ONE FT engagement, via a cardless 'await-user' pause.
 
 This is **shape A** of the SP4 school-chat cutover: instead of completing the engagement each turn,
 the flow pauses after every agentic answer purely to **hand the turn back to the user** (no card),

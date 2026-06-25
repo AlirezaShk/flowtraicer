@@ -1,4 +1,4 @@
-"""Cross-turn checkpoint/resume (NEEDS.md #1, sub-project 1).
+"""Cross-turn checkpoint/resume.
 
 A node can ``ctx.pause(...)`` to emit a payload and suspend; ``Workflow.start`` returns a paused
 turn; ``Workflow.resume`` continues the SAME engagement on a later (possibly fresh-process) call,

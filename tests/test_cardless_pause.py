@@ -1,4 +1,4 @@
-"""Cardless 'await-user' pause + re-entrant loop (NEEDS.md #A / #14).
+"""Cardless 'await-user' pause + re-entrant loop.
 
 Shape A of the SP4 cutover maps the WHOLE chat session to ONE FT engagement: after an agentic
 ``assist`` step answers, the flow pauses purely to hand the turn back to the user (no card) and

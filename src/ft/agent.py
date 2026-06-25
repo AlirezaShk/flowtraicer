@@ -1,4 +1,4 @@
-"""App-agnostic tool contract for the multi-tool agentic step (NEEDS.md #5).
+"""App-agnostic tool contract for the multi-tool agentic step.
 
 A :class:`AgentTool` binds a tool's *implementation* (an async/sync callable) to its name,
 description, and JSON-schema parameters — the shape a tool-calling model needs to choose and call

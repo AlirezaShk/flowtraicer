@@ -1,4 +1,4 @@
-"""ctx.emit from inside an AgentTool.handler (NEEDS.md #B / #15).
+"""ctx.emit from inside an AgentTool.handler.
 
 SP4 wraps the app's tools as ``ft.agent.AgentTool``s whose ``handler(args, ctx)`` must push tool
 render-events (cards) to the caller via ``ctx.emit(...)`` DURING the ``ctx.run_tools`` agentic loop.

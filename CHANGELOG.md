@@ -12,13 +12,13 @@ All notable changes to this project are documented here. The format is based on
 - **Durable checkpointers (`sqlite`/`postgres`) are now actually usable.** `build_checkpointer`
   previously returned the un-entered `*Saver.from_conn_string(...)` **context manager** instead of a
   saver, and never created the checkpoint tables. It now enters the context manager to return a
-  ready-to-use, process-lived saver and provisions its tables. (NEEDS.md #17 / SP4 risk #E.)
+  ready-to-use, process-lived saver and provisions its tables.
 
 ### Added
 - **One-time checkpointer table provisioning.** `build_checkpointer(backend, *, setup=True, …)` runs
   the saver's idempotent `.setup()` (`CREATE TABLE IF NOT EXISTS`) on first build by default so a
   freshly-pointed empty DB just works; pass `setup=False` to skip DDL when a migration provisions the
-  tables. The checkpoint tables share the FT trace DB cleanly (distinct table names). (NEEDS.md #17.)
+  tables. The checkpoint tables share the FT trace DB cleanly (distinct table names).
 
 ### Docs
 - **Cardless "await-user" pause guaranteed.** `ctx.pause(awaiting=…, payload=None)` (or `payload`
@@ -26,14 +26,14 @@ All notable changes to this project are documented here. The format is based on
   card), so a node can pause purely to hand the turn back to the user — making the
   whole-session-as-one-engagement re-entrant loop (`qualify → assist → await_user → assist …`) a
   documented, safe shape. New README bullet + runnable `python -m ft.examples.session_loop`.
-  (NEEDS.md #14 / SP4 risk #A.)
+ 
 - **`ctx.emit` from inside an `AgentTool.handler`.** Documented that the `ctx` passed to a tool
   handler is the running step's context, so `ctx.emit(payload)` from a handler during `ctx.run_tools`
   surfaces as an `emit` stream event under `stream`/`stream_resume` (and is a no-op under
-  `run`/`start`/`resume`). New README bullet in the agentic-step section. (NEEDS.md #15 / risk #B.)
+  `run`/`start`/`resume`). New README bullet in the agentic-step section.
 - **Resume-or-start dispatch idiom endorsed.** README blesses try-`stream_resume`/except-
   `ResumeError(reason="no_resumable_engagement")`→`stream` as the supported "resume the session or
-  start it" dispatch for an endpoint that doesn't track session start. (NEEDS.md #16 / risk #G.)
+  start it" dispatch for an endpoint that doesn't track session start.
 
 ### Tests
 - `tests/test_cardless_pause.py` (cardless pause + re-entrant loop + per-turn token scoping),
@@ -71,7 +71,7 @@ All notable changes to this project are documented here. The format is based on
   `reason="no_resumable_engagement"`. (Closes NEEDS.md #12.)
 
 ### Docs
-- Pinned the resume/turn contract that was previously ambiguous (NEEDS.md #11, #12, #13), with
+- Pinned the resume/turn contract that was previously ambiguous, with
   `tests/test_resume_contract.py`: `turn.interrupt` is guaranteed to be the **unwrapped** `payload`
   dict (`MessageForm.model_validate(turn.interrupt)` is safe); `resume(input=None)` makes
   `ctx.pause(...)` return `None` (not `{}`); a single `resume` may **re-pause** at a different node

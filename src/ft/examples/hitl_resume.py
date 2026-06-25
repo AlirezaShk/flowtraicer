@@ -1,4 +1,4 @@
-"""Human-in-the-loop pause/resume across turns (NEEDS.md #1, sub-project 1).
+"""Human-in-the-loop pause/resume across turns.
 
 A two-node workflow where the first node emits a card and **pauses** for the user's reply, and a
 later call **resumes** the SAME engagement with that reply. This is the shape a multi-turn chat
